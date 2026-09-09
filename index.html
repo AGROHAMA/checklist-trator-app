@@ -1,0 +1,2219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Agrohama · Checklist de Trator Digital</title>
+
+<!-- PWA: instalação na tela inicial e ícone do app -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#183a1d">
+<link rel="icon" type="image/x-icon" href="icons/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Checklist Trator">
+<meta name="mobile-web-app-capable" content="yes">
+
+<style>
+  :root{
+    --green-900:#183a1d;
+    --green-700:#276b32;
+    --green-600:#2f8a3c;
+    --green-500:#3aa64a;
+    --green-100:#e7f5ea;
+    --amber-500:#c9891f;
+    --amber-100:#fbf0dd;
+    --red-500:#b3402c;
+    --red-100:#fbe7e2;
+    --gray-900:#1f2421;
+    --gray-700:#4b544d;
+    --gray-400:#8a938c;
+    --gray-200:#dfe6e1;
+    --gray-100:#f3f6f4;
+    --white:#ffffff;
+    --radius:12px;
+    --shadow:0 2px 10px rgba(20,40,25,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--gray-100);
+    color:var(--gray-900);
+    padding-bottom:90px;
+  }
+  header{
+    background:var(--green-900);
+    color:var(--white);
+    padding:16px 16px 14px;
+    position:sticky;
+    top:0;
+    z-index:20;
+    box-shadow:var(--shadow);
+  }
+  header h1{
+    margin:0;
+    font-size:18px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  header .sub{
+    font-size:12px;
+    opacity:0.85;
+    margin-top:2px;
+  }
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:11px;
+    padding:3px 9px;
+    border-radius:999px;
+    margin-top:8px;
+    font-weight:600;
+  }
+  .status-online{background:rgba(58,166,74,0.25);color:#c7f0cd;}
+  .status-offline{background:rgba(201,137,31,0.28);color:#ffe6b8;}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+
+  main{max-width:640px;margin:0 auto;padding:14px;transition:max-width .15s ease;}
+  main.wide{max-width:1400px;}
+
+  .actions-row{display:flex;gap:10px;margin-bottom:14px;}
+  .btn{
+    border:none;
+    border-radius:var(--radius);
+    padding:13px 16px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    transition:transform .05s ease;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--green-600);color:#fff;flex:1;}
+  .btn-secondary{background:var(--white);color:var(--green-700);border:1.5px solid var(--green-600);}
+  .btn-ghost{background:transparent;color:var(--gray-700);border:1.5px solid var(--gray-200);}
+  .btn-block{width:100%;}
+  .btn-sm{padding:8px 12px;font-size:13px;border-radius:9px;}
+  .btn-danger{background:var(--red-500);color:#fff;}
+
+  .card{
+    background:var(--white);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px;
+    margin-bottom:12px;
+  }
+  .card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .op-title{font-weight:700;font-size:15px;}
+  .op-sub{font-size:12.5px;color:var(--gray-700);margin-top:2px;}
+  .badge{
+    font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;
+  }
+  .badge-andamento{background:var(--amber-100);color:var(--amber-500);}
+  .badge-concluido{background:var(--green-100);color:var(--green-700);}
+  .badge-sync{background:var(--gray-200);color:var(--gray-700);font-weight:600;}
+  .card-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--gray-700);margin-top:10px;}
+  .card-meta span b{color:var(--gray-900);}
+  .card-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+
+  .empty{
+    text-align:center;color:var(--gray-400);padding:40px 10px;font-size:14px;
+  }
+
+  .filter-row{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;}
+  .chip{
+    border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-700);
+    border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;
+  }
+  .chip.active{background:var(--green-700);border-color:var(--green-700);color:#fff;}
+
+  /* Modal */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(15,25,17,0.55);
+    display:none;align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:var(--white);
+    width:100%;max-width:640px;
+    border-radius:18px 18px 0 0;
+    max-height:92vh;
+    overflow-y:auto;
+    padding:18px 18px 24px;
+    animation:slideup .18s ease-out;
+  }
+  @keyframes slideup{from{transform:translateY(24px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .modal-title{font-size:16px;font-weight:700;margin:0 0 14px;display:flex;justify-content:space-between;align-items:center;}
+  .modal-title .close{font-size:22px;color:var(--gray-400);cursor:pointer;line-height:1;background:none;border:none;padding:4px;}
+
+  .field{margin-bottom:13px;}
+  .field label{display:block;font-size:12.5px;font-weight:700;color:var(--gray-700);margin-bottom:5px;}
+  .field .hint{font-size:11px;color:var(--gray-400);font-weight:400;margin-top:3px;}
+  input[type=text],input[type=number],input[type=date],input[type=time],input[type=url],textarea,select{
+    width:100%;padding:11px 12px;border:1.5px solid var(--gray-200);border-radius:9px;
+    font-size:15px;font-family:inherit;background:var(--gray-100);color:var(--gray-900);
+  }
+  textarea{resize:vertical;min-height:70px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .now-btn{margin-top:6px;}
+
+  .check-list label{
+    display:flex;align-items:center;gap:10px;padding:11px 12px;border:1.5px solid var(--gray-200);
+    border-radius:9px;margin-bottom:8px;font-size:14.5px;font-weight:600;background:var(--gray-100);
+  }
+  .check-list input{width:19px;height:19px;}
+
+  pre.teams-text{
+    white-space:pre-wrap;word-break:break-word;background:var(--gray-100);border:1.5px solid var(--gray-200);
+    border-radius:9px;padding:12px;font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    max-height:320px;overflow-y:auto;
+  }
+
+  .fab{
+    position:fixed;bottom:20px;right:16px;left:16px;max-width:608px;margin:0 auto;z-index:15;
+  }
+
+  footer.tabs{
+    position:fixed;bottom:0;left:0;right:0;background:var(--white);
+    border-top:1px solid var(--gray-200);display:flex;z-index:10;
+  }
+  footer.tabs button{
+    flex:1;border:none;background:none;padding:10px 4px 8px;font-size:11px;font-weight:600;
+    color:var(--gray-400);display:flex;flex-direction:column;align-items:center;gap:3px;
+  }
+  footer.tabs button.active{color:var(--green-700);}
+  footer.tabs .icon{font-size:18px;}
+
+  .settings-block{margin-bottom:18px;}
+  .settings-block h3{font-size:13px;margin:0 0 8px;color:var(--gray-700);text-transform:uppercase;letter-spacing:.03em;}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-200);}
+  .switch-row:last-child{border-bottom:none;}
+  .switch{position:relative;width:44px;height:25px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:var(--gray-200);border-radius:999px;cursor:pointer;transition:.15s;}
+  .slider:before{content:"";position:absolute;width:19px;height:19px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;}
+  input:checked + .slider{background:var(--green-600);}
+  input:checked + .slider:before{transform:translateX(19px);}
+
+  .toast{
+    position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+    background:var(--gray-900);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;
+    z-index:60;opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .toast.show{opacity:1;}
+
+  details.help{margin-bottom:14px;}
+  details.help summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--green-700);padding:4px 0;}
+  details.help div{font-size:12.5px;color:var(--gray-700);line-height:1.6;padding:8px 2px 2px;}
+
+  /* Painel semanal */
+  .week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;}
+  .week-nav .label{font-weight:700;font-size:14px;color:var(--gray-900);}
+  .week-nav .nav-buttons{display:flex;gap:6px;}
+  .week-board{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch;align-items:flex-start;}
+  .week-col{flex:0 0 230px;background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px;min-height:110px;}
+  .week-col.is-today{border:2px solid var(--green-600);}
+  .week-col-header{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:13px;color:var(--green-700);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--gray-200);}
+  .week-col-date{font-size:11px;color:var(--gray-400);font-weight:600;}
+  .week-empty{font-size:11.5px;color:var(--gray-400);text-align:center;padding:14px 4px;}
+  .week-card{background:var(--gray-100);border-radius:9px;padding:10px;margin-bottom:8px;border:1px solid var(--gray-200);}
+  .week-card.is-launched{opacity:0.55;}
+  .week-card-title{font-weight:700;font-size:12.5px;}
+  .week-card-sub{font-size:11px;color:var(--gray-700);margin-top:1px;}
+  .week-card-meta{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--gray-700);margin-top:6px;}
+  .week-launched-toggle{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;color:var(--gray-700);margin-top:8px;cursor:pointer;}
+  .week-launched-toggle input{width:15px;height:15px;flex-shrink:0;}
+  .week-card-actions{margin-top:8px;}
+
+  /* Fotos obrigatórias do checklist */
+  .photo-field{
+    border:1.5px solid var(--gray-200);border-radius:9px;padding:11px 12px;margin-bottom:8px;background:var(--gray-100);
+  }
+  .photo-field.is-done{border-color:var(--green-600);background:var(--green-100);}
+  .photo-field-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .photo-field-title{font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:7px;}
+  .photo-required-tag{font-size:10.5px;font-weight:700;color:var(--red-500);background:var(--red-100);padding:2px 7px;border-radius:999px;}
+  .photo-done-tag{font-size:10.5px;font-weight:700;color:var(--green-700);background:var(--green-100);padding:2px 7px;border-radius:999px;}
+  .photo-preview-row{display:flex;align-items:center;gap:10px;margin-top:8px;}
+  .photo-thumb{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1.5px solid var(--gray-200);cursor:pointer;}
+  .photo-field input[type=file]{display:none;}
+  .verified-row{
+    display:flex;align-items:center;gap:9px;margin-top:10px;padding-top:10px;
+    border-top:1.5px dashed var(--gray-200);font-size:13.5px;font-weight:600;color:var(--gray-900);cursor:pointer;
+  }
+  .verified-row input{width:18px;height:18px;flex-shrink:0;}
+  .photos-view-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;margin-bottom:10px;}
+  .photos-view-grid img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1.5px solid var(--gray-200);cursor:pointer;}
+  .photos-view-label{font-size:11px;color:var(--gray-700);font-weight:600;margin-bottom:4px;}
+
+  /* Relato de problema / máquina parada */
+  .badge-problema{background:var(--red-100);color:var(--red-500);}
+  .week-card.has-problema{border-color:var(--red-500);background:var(--red-100);}
+  .photo-optional-tag{font-size:10.5px;font-weight:700;color:var(--gray-700);background:var(--gray-200);padding:2px 7px;border-radius:999px;}
+  .problema-box{background:var(--red-100);border:1.5px solid var(--red-500);border-radius:9px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;color:var(--gray-900);}
+  .problema-box b{color:var(--red-500);}
+
+  /* Manutenção por horímetro */
+  .maint-alert{border-radius:9px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .maint-alert.is-proximo{background:var(--amber-100);border:1.5px solid var(--amber-500);color:var(--gray-900);}
+  .maint-alert.is-vencido{background:var(--red-100);border:1.5px solid var(--red-500);color:var(--gray-900);}
+  .maint-alert b{display:block;font-size:13px;}
+  .maint-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin-bottom:12px;}
+  .maint-card.st-vencido{border:1.5px solid var(--red-500);}
+  .maint-card.st-proximo{border:1.5px solid var(--amber-500);}
+  .maint-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .maint-card-title{font-weight:700;font-size:15px;}
+  .maint-status-pill{font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;}
+  .maint-status-pill.st-ok{background:var(--green-100);color:var(--green-700);}
+  .maint-status-pill.st-proximo{background:var(--amber-100);color:var(--amber-500);}
+  .maint-status-pill.st-vencido{background:var(--red-100);color:var(--red-500);}
+  .maint-status-pill.st-sem_dados{background:var(--gray-200);color:var(--gray-700);}
+  .maint-card-meta{font-size:12.5px;color:var(--gray-700);margin-top:8px;line-height:1.6;}
+  .maint-card-meta b{color:var(--gray-900);}
+  .maint-card-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+
+  /* Lembrete de orientação (cuidado com a máquina) */
+  .orientacao-box{background:var(--amber-100);border:1.5px solid var(--amber-500);border-radius:9px;padding:11px 12px;margin-bottom:12px;font-size:12.5px;color:var(--gray-900);line-height:1.5;}
+  .orientacao-box b{color:var(--amber-500);}
+
+  /* Tela de bloqueio por senha (PIN) */
+  .pin-dots{display:flex;gap:12px;justify-content:center;margin:18px 0;}
+  .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--gray-400,#b7b7c2);background:transparent;}
+  .pin-dot.filled{background:var(--green-700,#1f7a3d);border-color:var(--green-700,#1f7a3d);}
+  .pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:260px;margin:0 auto;}
+  .pin-key{font-size:20px;font-weight:700;padding:14px 0;border-radius:10px;border:1px solid var(--gray-200);background:var(--white);cursor:pointer;}
+  .pin-key:active{background:var(--gray-200);}
+  .pin-error{color:var(--red-500);text-align:center;font-size:12.5px;min-height:18px;margin-top:6px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚜 Checklist de Trator Digital</h1>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção</div>
+  <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
+</header>
+
+<main id="mainEl">
+
+  <div id="viewHome">
+    <details class="help">
+      <summary>Como usar (toque para abrir)</summary>
+      <div>
+        Este app substitui a folha de papel. Funciona <b>totalmente offline</b> — os dados ficam salvos neste aparelho mesmo sem internet.<br><br>
+        1) Toque em <b>"Iniciar Operação"</b> no começo do serviço.<br>
+        2) No final do dia, abra o registro e toque em <b>"Finalizar"</b> para lançar hora final, horímetro e o checklist de manutenção. É <b>obrigatório fotografar</b> o filtro de ar, a vareta do óleo do motor e o nível do líquido de arrefecimento — sem essas 3 fotos o app não deixa concluir.<br>
+        3) Em qualquer registro dá pra tocar em <b>"Gerar texto Teams"</b> para copiar e colar no canal do maquinário (as fotos aparecem juntas para conferência).<br>
+        4) Se a máquina quebrar ou parar no meio do serviço, toque em <b>"⚠️ Relatar Problema"</b> no registro em andamento — isso atualiza o mesmo card no Teams (não cria outro) marcando "🔴 Parada", e some quando você tocar em "✅ Marcar Resolvido".<br>
+        5) Se configurar um link de automação (aba Ajustes), o app tenta enviar sozinho quando houver internet. Se o sinal for fraco/instável e algo ficar pendente, aparece o botão <b>"📤 Enviar pendências agora"</b> no topo da tela — toque nele quando achar que pegou sinal, ele tenta de novo mesmo que o aparelho ainda marque como "offline".<br><br>
+        <i>As fotos ficam salvas no aparelho junto com o registro — exporte periodicamente (aba Ajustes) para não perder nada e liberar espaço.</i>
+      </div>
+    </details>
+
+    <div class="actions-row">
+      <button class="btn btn-primary btn-block" onclick="openStartForm()">＋ Iniciar Operação</button>
+    </div>
+
+    <div class="actions-row" id="pendingSyncRow" style="display:none;">
+      <button class="btn btn-secondary btn-block" id="pendingSyncBtn" onclick="manualSendPending()">📤 Enviar pendências agora</button>
+    </div>
+
+    <div id="maintBanner"></div>
+
+    <div class="filter-row" id="filterRow">
+      <div class="chip active" data-filter="hoje">Hoje</div>
+      <div class="chip" data-filter="andamento">Em andamento</div>
+      <div class="chip" data-filter="concluido">Concluídas</div>
+      <div class="chip" data-filter="todos">Todos os dias</div>
+    </div>
+
+    <div id="list"></div>
+  </div>
+
+  <div id="viewWeek" style="display:none;">
+    <details class="help">
+      <summary>Como usar este painel (toque para abrir)</summary>
+      <div>
+        Cada coluna é um dia da semana (Segunda a Domingo, incluindo fim de semana quando tiver operação). O cartão fica no dia em que a operação <b>realmente aconteceu</b> — pela data registrada no app — mesmo que os dados só tenham chegado/sincronizado depois, por falta de sinal no campo.<br><br>
+        Use este painel para conferir os dados e lançar no Ruraltec Agro. Marque <b>"Lançado no Ruraltec Agro"</b> em cada cartão depois de digitar, para saber o que já falta lançar.
+      </div>
+    </details>
+    <div class="week-nav">
+      <div class="label" id="weekLabel">Semana de --/-- a --/--</div>
+      <div class="nav-buttons">
+        <button class="btn btn-ghost btn-sm" onclick="weekNav(-1)">‹ Anterior</button>
+        <button class="btn btn-ghost btn-sm" onclick="weekNav(0, true)">Esta semana</button>
+        <button class="btn btn-ghost btn-sm" onclick="weekNav(1)">Próxima ›</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="chip" id="hideLaunchedChip" onclick="toggleHideLaunched()">Ocultar já lançados</div>
+    </div>
+    <div class="week-board" id="weekBoard"></div>
+  </div>
+
+  <div id="viewMaintenance" style="display:none;">
+    <details class="help">
+      <summary>Como funciona (toque para abrir)</summary>
+      <div>
+        Cadastre aqui cada trator/máquina. Dois recursos, independentes — pode usar um, outro ou os dois:<br><br>
+        <b>Manutenção por horímetro:</b> informe o intervalo (de quantas em quantas horas precisa trocar óleo/filtro) e o horímetro da última manutenção. O app calcula o horímetro atual pelos registros já lançados e avisa aqui no app e no Planner/Teams: amarelo faltando 20h, vermelho quando já venceu. Depois de fazer a manutenção de verdade, toque em "Manutenção feita agora" no card pra zerar a contagem.<br><br>
+        <b>Numeração do talão:</b> o número é do trator (não do operador), no formato <b>número da máquina + dia + mês + ano (2 dígitos) + hora + minuto</b>, sem nenhuma pontuação — ex: 972408260732 (trator 97, dia 24/08/26, às 07:32). É 100% automático: aparece sozinho ao selecionar o Trator na tela de Iniciar Operação, não dá pra editar à mão, e não precisa de internet nem de sincronizar entre aparelhos. Com o ano entrando (mesmo que só com 2 dígitos), a chance de dois talões do mesmo trator baterem o número é praticamente nula — só se repetiria em anos que terminam nos mesmos 2 dígitos (ex: 2026 e 2126). Informe o "Número de referência" da máquina (3 dígitos) uma única vez aqui — já vem sugerido pra tratores KH e veículos já conhecidos — e o app cuida do resto sozinho.
+      </div>
+    </details>
+
+    <div class="settings-block">
+      <h3 id="maintFormTitle">Cadastrar equipamento</h3>
+      <input type="hidden" id="maint_editId">
+      <div class="field">
+        <label>Trator / máquina</label>
+        <input type="text" id="maint_trator" list="equipSuggestions" placeholder="ex: KH 97" oninput="onMaintTractorInput(this.value)">
+        <div class="hint">Use o mesmo código que você digita no campo "Trator" ao iniciar uma operação.</div>
+      </div>
+      <div class="field" style="margin-top:2px;"><b style="font-size:12.5px;color:var(--gray-700);">Manutenção por horímetro (opcional)</b></div>
+      <div class="row2">
+        <div class="field">
+          <label>Intervalo de manutenção (horas)</label>
+          <input type="text" inputmode="decimal" id="maint_intervalo" placeholder="ex: 250" oninput="sanitizeDecimalInput(this)">
+        </div>
+        <div class="field">
+          <label>Horímetro na última manutenção</label>
+          <input type="text" inputmode="decimal" id="maint_ultimoHorimetro" placeholder="ex: 1200" oninput="sanitizeDecimalInput(this)">
+        </div>
+      </div>
+      <div class="field" style="margin-top:2px;"><b style="font-size:12.5px;color:var(--gray-700);">Numeração do talão deste trator/veículo (opcional)</b></div>
+      <div class="field">
+        <label>Número de referência da máquina (3 dígitos)</label>
+        <input type="text" id="maint_machineRef" placeholder="ex: 057" maxlength="3">
+        <div class="hint">Já vem sugerido pra tratores KH (o próprio número, ex: KH 57 → 057) e pros veículos já cadastrados. Cada máquina precisa de um número diferente — é isso que garante que o número final nunca repete entre tratores/veículos, mesmo sem internet.</div>
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-primary" style="flex:1;" onclick="saveMaintConfig()">Salvar equipamento</button>
+        <button class="btn btn-ghost" id="maint_cancelBtn" style="display:none;" onclick="resetMaintForm()">Cancelar edição</button>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Equipamentos cadastrados</h3>
+      <div id="maintList"></div>
+    </div>
+  </div>
+
+  <div id="viewSettings" style="display:none;">
+    <div class="settings-block">
+      <h3>Integração com Teams</h3>
+      <div class="field">
+        <label>URL de automação (webhook / Power Automate)</label>
+        <input type="url" id="webhookUrl" placeholder="https://...">
+        <div class="hint">Opcional. Se preenchido, o app tenta enviar automaticamente o registro ao iniciar e ao finalizar uma operação, assim que houver internet. Sem isso, use "Gerar texto Teams" e cole manualmente.</div>
+      </div>
+      <div class="field">
+        <label>URL de automação — Manutenção (webhook / Power Automate)</label>
+        <input type="url" id="webhookUrlManut" placeholder="https://...">
+        <div class="hint">Cole aqui a URL do fluxo "Cadastro e Alerta de Manutencao". Configure em TODOS os aparelhos: sempre que alguém finalizar uma operação neste aparelho, o horímetro atual do trator é enviado automaticamente pra SharePoint e o app dispara o aviso de manutenção no Teams — não importa qual aparelho ou operador finalizou.</div>
+      </div>
+      <div class="switch-row">
+        <div>
+          <div style="font-weight:600;font-size:13.5px;">Tentar envio automático</div>
+          <div class="hint">Precisa da URL acima configurada.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="autoSyncToggle"><span class="slider"></span></label>
+      </div>
+      <button class="btn btn-secondary btn-block" style="margin-top:12px;" onclick="saveSettings()">Salvar ajustes</button>
+    </div>
+
+    <div class="settings-block">
+      <h3>Dados neste aparelho</h3>
+      <div class="hint" style="margin-bottom:10px;">Os registros e o cadastro de equipamentos (aba Manutenção) ficam salvos só neste aparelho até serem sincronizados/copiados. Use exportar para fazer backup ou levar os dados para outro aparelho/computador — por exemplo, pra não ter que cadastrar cada trator/veículo de novo em todo celular. A numeração do talão em si não depende disso: é gerada automaticamente com base na data/hora, então nunca se repete entre aparelhos, mesmo sem exportar/importar.</div>
+      <div class="actions-row">
+        <button class="btn btn-ghost" style="flex:1;" onclick="exportData()">⬇ Exportar (.json)</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('importFile').click()">⬆ Importar</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importData(event)">
+    </div>
+
+    <div class="settings-block">
+      <h3>Segurança</h3>
+      <div class="hint" style="margin-bottom:10px;">Protege as abas Ajustes e Manutenção com uma senha numérica de 4 dígitos neste aparelho. A senha é só um bloqueio simples — não é criptografia. Não tem "esqueci minha senha": se perder, a única forma de recuperar é apagar os dados do site neste aparelho (o que também apaga os registros ainda não sincronizados). Guarde a senha em lugar seguro. Cada aparelho tem sua própria senha, configurada separadamente.</div>
+      <div id="securityStatus" style="font-weight:600;font-size:13.5px;margin-bottom:10px;">🔓 Nenhuma senha definida</div>
+      <div class="actions-row">
+        <button class="btn btn-secondary" id="btnSetPin" style="flex:1;" onclick="openPinSetFlow()">Definir senha</button>
+        <button class="btn btn-ghost" id="btnRemovePin" style="flex:1;display:none;" onclick="openPinRemoveFlow()">Remover senha</button>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Zona de risco</h3>
+      <button class="btn btn-danger btn-block" onclick="clearAll()">Apagar todos os registros deste aparelho</button>
+    </div>
+  </div>
+
+</main>
+
+<footer class="tabs">
+  <button id="tabHome" class="active" onclick="switchTab('home')"><span class="icon">📋</span>Registros</button>
+  <button id="tabWeek" onclick="switchTab('week')"><span class="icon">📅</span>Semana</button>
+  <button id="tabMaintenance" onclick="requestTab('maintenance')"><span class="icon">🔧</span>Manutenção</button>
+  <button id="tabSettings" onclick="requestTab('settings')"><span class="icon">⚙️</span>Ajustes</button>
+</footer>
+
+<datalist id="equipSuggestions"></datalist>
+
+<!-- Modal: Iniciar / Editar -->
+<div class="modal-overlay" id="modalStart">
+  <div class="modal">
+    <div class="modal-title"><span id="startModalTitle">Iniciar Operação</span><button class="close" onclick="closeModal('modalStart')">&times;</button></div>
+    <form id="formStart" onsubmit="return false;">
+      <div class="row2">
+        <div class="field">
+          <label>Data</label>
+          <input type="date" id="f_date">
+        </div>
+        <div class="field">
+          <label>Hora Início</label>
+          <input type="time" id="f_horaInicio">
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm now-btn" onclick="setNow('f_horaInicio')">Usar hora atual</button>
+
+      <div class="field" style="margin-top:14px;">
+        <label>Fazenda</label>
+        <input type="text" id="f_farm" placeholder="ex: Fazenda Coringa">
+      </div>
+      <div class="field">
+        <label>Talhão</label>
+        <input type="text" id="f_plot" placeholder="ex: Pivô Guaíra">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Cultura</label>
+          <input type="text" id="f_culture" placeholder="ex: Batata">
+        </div>
+        <div class="field">
+          <label>Operação</label>
+          <input type="text" id="f_operation" placeholder="ex: Colheita">
+        </div>
+      </div>
+      <div class="field">
+        <label>Operador</label>
+        <input type="text" id="f_operator" placeholder="ex: Alex">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Trator</label>
+          <input type="text" id="f_tractor" list="equipSuggestions" placeholder="ex: KH 97" oninput="onTractorFieldChange(this.value)">
+        </div>
+        <div class="field">
+          <label>Implementos</label>
+          <input type="text" id="f_implement" placeholder="ex: Arrancadeira">
+        </div>
+      </div>
+      <div class="field">
+        <label>Nº do talão (automático)</label>
+        <input type="text" id="f_formNumber" placeholder="aparece sozinho ao preencher o Trator acima" readonly style="background:var(--gray-200);color:var(--gray-900);">
+        <div class="hint">Gerado sozinho assim que a máquina é reconhecida no campo Trator acima — referência da máquina + dia + mês + ano + hora + minuto, sem pontuação (ex: KH 94 às 13:38 do dia 17/08/2026 → 94170820261338). Não dá pra editar à mão.</div>
+      </div>
+      <div class="field">
+        <label>Horímetro Inicial</label>
+        <input type="text" inputmode="decimal" id="f_horimetroInicial" placeholder="ex: 610.3" oninput="sanitizeDecimalInput(this)">
+      </div>
+
+      <div class="orientacao-box">
+        ⚠️ <b>Lembrete:</b> você sabe das suas obrigações. Cuide da máquina que você opera — o zelo e o cuidado no dia a dia evitam quebras, prejuízo e podem custar até o seu próprio trabalho amanhã. Faça as verificações abaixo sempre que possível.
+      </div>
+
+      <div class="field">
+        <label>Checklist de Manutenção (opcional)</label>
+        <div class="hint" style="margin-bottom:8px;">As fotos são opcionais — em alguns tratores é difícil remover o filtro de ar. Tire quando conseguir.</div>
+
+        <div class="photo-field" id="photoField_agua">
+          <div class="photo-field-head">
+            <div class="photo-field-title">💧 Nível do Líquido de Arrefecimento</div>
+            <span class="photo-optional-tag" id="photoTag_agua">Opcional</span>
+          </div>
+          <div class="photo-preview-row">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('photoInput_agua').click()">📷 Tirar/Escolher foto</button>
+            <input type="file" accept="image/jpeg" capture="environment" id="photoInput_agua" onchange="capturePhoto('agua', this)">
+          </div>
+          <label class="verified-row"><input type="checkbox" id="chk_verificado_agua"> Foi verificado</label>
+        </div>
+
+        <div class="photo-field" id="photoField_oleoMotor">
+          <div class="photo-field-head">
+            <div class="photo-field-title">🛢️ Vareta do Óleo do Motor</div>
+            <span class="photo-optional-tag" id="photoTag_oleoMotor">Opcional</span>
+          </div>
+          <div class="photo-preview-row">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('photoInput_oleoMotor').click()">📷 Tirar/Escolher foto</button>
+            <input type="file" accept="image/jpeg" capture="environment" id="photoInput_oleoMotor" onchange="capturePhoto('oleoMotor', this)">
+          </div>
+          <label class="verified-row"><input type="checkbox" id="chk_verificado_oleoMotor"> Foi verificado</label>
+        </div>
+
+        <div class="photo-field" id="photoField_filtroAr">
+          <div class="photo-field-head">
+            <div class="photo-field-title">🌬️ Filtro de Ar do Motor</div>
+            <span class="photo-optional-tag" id="photoTag_filtroAr">Opcional</span>
+          </div>
+          <div class="photo-preview-row">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('photoInput_filtroAr').click()">📷 Tirar/Escolher foto</button>
+            <input type="file" accept="image/jpeg" capture="environment" id="photoInput_filtroAr" onchange="capturePhoto('filtroAr', this)">
+          </div>
+          <label class="verified-row"><input type="checkbox" id="chk_verificado_filtroAr"> Foi verificado</label>
+        </div>
+
+        <div class="photo-field" id="photoField_oleoHidraulico">
+          <div class="photo-field-head">
+            <div class="photo-field-title">🛢️ Óleo Hidráulico</div>
+            <span class="photo-optional-tag" id="photoTag_oleoHidraulico">Opcional</span>
+          </div>
+          <div class="photo-preview-row">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('photoInput_oleoHidraulico').click()">📷 Tirar/Escolher foto</button>
+            <input type="file" accept="image/jpeg" capture="environment" id="photoInput_oleoHidraulico" onchange="capturePhoto('oleoHidraulico', this)">
+          </div>
+          <label class="verified-row"><input type="checkbox" id="chk_verificado_oleoHidraulico"> Foi verificado</label>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-block" style="margin-top:6px;" onclick="saveStart()">Salvar registro</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Finalizar -->
+<div class="modal-overlay" id="modalFinish">
+  <div class="modal">
+    <div class="modal-title">Finalizar Operação<button class="close" onclick="closeModal('modalFinish')">&times;</button></div>
+    <form id="formFinish" onsubmit="return false;">
+      <input type="hidden" id="fin_id">
+      <div class="field">
+        <label>Hora Final</label>
+        <input type="time" id="fin_horaFinal">
+        <button type="button" class="btn btn-ghost btn-sm now-btn" onclick="setNow('fin_horaFinal')">Usar hora atual</button>
+      </div>
+      <div class="field">
+        <label>Horímetro Final</label>
+        <input type="text" inputmode="decimal" id="fin_horimetroFinal" oninput="sanitizeDecimalInput(this)">
+      </div>
+
+      <div class="field">
+        <label>Observações</label>
+        <textarea id="fin_obs" placeholder="Ex: faltou água no radiador, nível de óleo baixo, etc."></textarea>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-block" onclick="saveFinish()">Concluir operação</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Relatar Problema -->
+<div class="modal-overlay" id="modalProblema">
+  <div class="modal">
+    <div class="modal-title">⚠️ Relatar Problema<button class="close" onclick="closeModal('modalProblema')">&times;</button></div>
+    <form id="formProblema" onsubmit="return false;">
+      <input type="hidden" id="prob_id">
+      <div class="field">
+        <label>O que aconteceu?</label>
+        <textarea id="prob_texto" placeholder="Ex: máquina quebrou, correia rompeu, pneu furou, etc."></textarea>
+        <div class="hint">Isso atualiza o mesmo card no Teams — não cria um novo, e o card fica marcado como parado até você marcar como resolvido.</div>
+      </div>
+      <div class="field">
+        <label>Foto (opcional)</label>
+        <div class="photo-field" id="photoField_problema">
+          <div class="photo-field-head">
+            <div class="photo-field-title">📷 Foto do problema</div>
+            <span class="photo-optional-tag" id="photoTag_problema">Opcional</span>
+          </div>
+          <div class="photo-preview-row">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('photoInput_problema').click()">📷 Tirar/Escolher foto</button>
+            <input type="file" accept="image/jpeg" capture="environment" id="photoInput_problema" onchange="captureProblemPhoto(this)">
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn btn-danger btn-block" onclick="saveProblem()">🔴 Enviar relato — máquina parada</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Dados da operação / texto Teams -->
+<div class="modal-overlay" id="modalTeams">
+  <div class="modal">
+    <div class="modal-title">Dados da Operação<button class="close" onclick="closeModal('modalTeams')">&times;</button></div>
+    <div class="hint" style="margin-bottom:8px;">Use para colar no Teams ou para conferir campo a campo ao lançar no Ruraltec Agro.</div>
+    <div id="teamsPhotosBox"></div>
+    <pre class="teams-text" id="teamsTextBox"></pre>
+    <button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="copyTeamsText()">📋 Copiar texto</button>
+  </div>
+</div>
+
+<!-- Modal: Senha (PIN) de acesso -->
+<div class="modal-overlay" id="modalPin">
+  <div class="modal">
+    <div class="modal-title"><span id="pinModalTitle">Digite a senha</span><button class="close" onclick="closePinModal()">&times;</button></div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="pin-keypad">
+      <button type="button" class="pin-key" onclick="pinKeyPress(1)">1</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(2)">2</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(3)">3</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(4)">4</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(5)">5</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(6)">6</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(7)">7</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(8)">8</button>
+      <button type="button" class="pin-key" onclick="pinKeyPress(9)">9</button>
+      <div></div>
+      <button type="button" class="pin-key" onclick="pinKeyPress(0)">0</button>
+      <button type="button" class="pin-key" onclick="pinBackspace()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== Armazenamento local (offline-first) ===================== */
+const STORAGE_KEY = 'agrohama_operacoes_v1';
+const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
+
+function loadRecords(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveRecords(records){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    return true;
+  }catch(e){
+    // Armazenamento cheio (comum em aparelhos com muitas fotos acumuladas).
+    // Tenta liberar espaço removendo fotos de registros antigos já concluídos e sincronizados.
+    try{
+      const sorted = records.slice().sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));
+      for(const r of sorted){
+        if(r.synced && r.status === 'concluido' && r.fotos && (r.fotos.agua || r.fotos.oleoMotor || r.fotos.filtroAr || r.fotos.oleoHidraulico)){
+          r.fotos = {agua:null, oleoMotor:null, filtroAr:null, oleoHidraulico:null};
+          try{
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+            toast('Armazenamento do aparelho estava cheio: fotos antigas já sincronizadas foram apagadas do aparelho para liberar espaço.');
+            return true;
+          }catch(e2){ /* continua liberando mais registros */ }
+        }
+      }
+    }catch(e3){ /* ignora e cai no aviso abaixo */ }
+    toast('ATENÇÃO: armazenamento do aparelho está cheio e este registro pode não ter sido salvo localmente.');
+    return false;
+  }
+}
+function loadSettings(){
+  try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {webhookUrl:'', webhookUrlManut:'', autoSync:false}; }
+  catch(e){ return {webhookUrl:'', webhookUrlManut:'', autoSync:false}; }
+}
+function saveSettingsObj(s){
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+let records = loadRecords();
+let settings = loadSettings();
+if(!settings.adminPin) settings.adminPin = '';
+let currentFilter = 'hoje';
+
+/* ===================== Manutenção por horímetro ===================== */
+const MAINT_KEY = 'agrohama_manutencao_v1';
+// Lista pré-preenchida a partir do relatório de bens da Agrohama (Fazenda Treis Coringas).
+// Serve só como sugestão no campo "Trator" — pode digitar qualquer coisa que não esteja aqui.
+// campo "ref" = número de referência de 3 dígitos usado na numeração do talão (ref+dia+mês+ano2+hora+minuto).
+// null = ainda não participa dessa numeração (fora do escopo atual: só tratores KH/M e veículos).
+const MASTER_EQUIPAMENTOS = [
+  {codigo:'M.01', descricao:'Trator 7500 SLC — John Deere', ref:'001'},
+  {codigo:'M.02', descricao:'Trator TL 85 E — New Holland', ref:'002'},
+  {codigo:'KH 20', descricao:'Pulverizador Autopropelido Uniport 2030 — Jacto', ref:'020'},
+  {codigo:'KH 24', descricao:'Trator 7630 S-100 — New Holland', ref:'024'},
+  {codigo:'KH 27', descricao:'Trator TL 75 E — New Holland', ref:'027'},
+  {codigo:'KH 29', descricao:'Trator 7630 — New Holland', ref:'029'},
+  {codigo:'KH 30', descricao:'Grua 290/4 — Massey Ferguson', ref:'030'},
+  {codigo:'KH 31', descricao:'Grua 290/4 (creu) — Massey Ferguson', ref:'031'},
+  {codigo:'KH 32', descricao:'Trator TL 75 E Cabinado — New Holland', ref:'032'},
+  {codigo:'KH 35', descricao:'Trator TL 75 E — New Holland', ref:'035'},
+  {codigo:'KH 38', descricao:'Retroescavadeira — Case', ref:'038'},
+  {codigo:'KH 40', descricao:'Trator TL 75 E — New Holland', ref:'040'},
+  {codigo:'KH 43', descricao:'Trator TL 75 E — New Holland', ref:'043'},
+  {codigo:'KH 47', descricao:'Trator T6 — New Holland', ref:'047'},
+  {codigo:'KH 51', descricao:'Trator TL 95 E — New Holland', ref:'051'},
+  {codigo:'KH 52', descricao:'Trator TL 75 E — New Holland', ref:'052'},
+  {codigo:'KH 54', descricao:'Trator T7 175 — New Holland', ref:'054'},
+  {codigo:'KH 57', descricao:'Trator TT 4030 — New Holland', ref:'057'},
+  {codigo:'KH 58', descricao:'Trator BH 140 — Valtra', ref:'058'},
+  {codigo:'KH 60', descricao:'Pulverizador Autopropelido Uniport 2030 — Jacto', ref:'060'},
+  {codigo:'KH 61', descricao:'Empilhadeira C25 — Clark', ref:'061'},
+  {codigo:'KH 62', descricao:'Trator TM 7040 Exitus — New Holland', ref:'062'},
+  {codigo:'KH 63', descricao:'Colhedeira CR5.85 — New Holland', ref:'063'},
+  {codigo:'KH 76', descricao:'Trator 7630 — New Holland', ref:'076'},
+  {codigo:'KH 77', descricao:'Trator T7 175 — New Holland', ref:'077'},
+  {codigo:'KH 93', descricao:'Colhedeira TC 5.90 — New Holland', ref:'093'},
+  {codigo:'KH 94', descricao:'Trator TL 5.100 Cabinado — New Holland', ref:'094'},
+  {codigo:'KH 95', descricao:'Trator Canavieiro TS 6000 — New Holland', ref:'095'},
+  {codigo:'KH 96', descricao:'Trator 7M215 — John Deere', ref:'096'},
+  {codigo:'KH 97', descricao:'Trator TL 5.80C — New Holland', ref:'097'},
+  {codigo:'KH 98', descricao:'Trator T6 130 Cabinado — New Holland', ref:'098'},
+  {codigo:'NH 29', descricao:'Colhedeira de Tubérculos Batata — Hennipman', ref:null},
+  {codigo:'NH 06', descricao:'Colhedora de Batata Arrasto — Watanabe', ref:null},
+  {codigo:'BLY-3206', descricao:'Caminhão Caçamba Cristina D68', ref:'100'},
+  {codigo:'FUY1G77', descricao:'Caminhão Iveco 07 Lugares', ref:'101'},
+  {codigo:'GVJ-4797', descricao:'Caminhão L 1620 — Mercedes', ref:'102'},
+  {codigo:'BWT-0384', descricao:'Caminhão VW 14.140', ref:'103'},
+  {codigo:'CNR-1591', descricao:'Caminhão VW 17.210 — Motor Cummins', ref:'104'},
+  {codigo:'EZW2H01', descricao:'Camionete F-350 — Ford', ref:'105'},
+  {codigo:'FLC-4755', descricao:'Camionete F350 — Ford', ref:'106'},
+  {codigo:'EKR-5613', descricao:'Camionete F4000 — Ford', ref:'107'},
+  {codigo:'NFS-2557', descricao:'Camionete F4000 G (Baú) — Ford', ref:'108'},
+  {codigo:'TJS1E95', descricao:'Hilux (Masao) — Toyota', ref:'109'},
+  {codigo:'SVC9J55', descricao:'Hilux (Mauricio) — Toyota', ref:'110'},
+  {codigo:'RVY5G06', descricao:'L200 Triton — Mitsubishi', ref:'111'},
+  {codigo:'GHZ8G27', descricao:'Strada Endurance CS — Fiat', ref:'112'},
+  {codigo:'QUL8J67', descricao:'Strada NH Ura — Fiat', ref:'113'},
+  {codigo:'FPI7E55', descricao:'Strada Volcano — Fiat', ref:'114'},
+  {codigo:'TDC7H28', descricao:'S10 LTZ — Chevrolet', ref:'115'},
+  {codigo:'SYR4I45', descricao:'Argo — Fiat', ref:'116'},
+  {codigo:'QUM-8575', descricao:'Jeep Compass', ref:'117'},
+  {codigo:'FNJ-2024', descricao:'Kombi — Volkswagen', ref:'118'},
+  {codigo:'TYF1C16', descricao:'Mobi Like — Fiat', ref:'119'}
+];
+function findMasterEquip(codigo){
+  if(!codigo) return null;
+  const alvo = codigo.trim().toLowerCase();
+  return MASTER_EQUIPAMENTOS.find(e => e.codigo.trim().toLowerCase() === alvo) || null;
+}
+// Sugere o número de referência de 3 dígitos pra um trator/veículo: usa a lista conhecida primeiro;
+// se não encontrar, tenta inferir pelo padrão "KH ##" ou "M.0#" (mesma convenção usada pelos já cadastrados).
+function suggestMachineRef(codigo){
+  if(!codigo) return '';
+  const known = findMasterEquip(codigo);
+  if(known && known.ref) return known.ref;
+  const semEspaco = codigo.trim();
+  let m = semEspaco.match(/^kh\s*0*(\d{1,3})$/i);
+  if(m) return m[1].padStart(3, '0');
+  m = semEspaco.match(/^m\.?\s*0*(\d{1,2})$/i);
+  if(m) return m[1].padStart(3, '0');
+  return '';
+}
+function buildEquipDatalist(){
+  const dl = document.getElementById('equipSuggestions');
+  if(!dl) return;
+  dl.innerHTML = MASTER_EQUIPAMENTOS.map(e => `<option value="${escapeHtml(e.codigo)}">${escapeHtml(e.codigo)} — ${escapeHtml(e.descricao)}</option>`).join('');
+}
+
+function loadMaint(){
+  try{ return JSON.parse(localStorage.getItem(MAINT_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveMaint(list){
+  try{ localStorage.setItem(MAINT_KEY, JSON.stringify(list)); }catch(e){ toast('Não foi possível salvar a configuração de manutenção neste aparelho.'); }
+}
+let maintConfigs = loadMaint();
+
+// Maior horímetro conhecido para um trator/máquina, a partir dos registros de operação já lançados.
+function getCurrentHorimetro(tratorNome){
+  if(!tratorNome) return null;
+  const alvo = tratorNome.trim().toLowerCase();
+  let max = null;
+  records.forEach(r=>{
+    if(!r.tractor || r.tractor.trim().toLowerCase() !== alvo) return;
+    [r.horimetroFinal, r.horimetroInicial].forEach(v=>{
+      const n = parseFloat(v);
+      if(!isNaN(n) && (max === null || n > max)) max = n;
+    });
+  });
+  return max;
+}
+
+function computeMaintStatus(cfg){
+  const atual = getCurrentHorimetro(cfg.trator);
+  const intervalo = parseFloat(cfg.intervaloHoras);
+  const ultimo = parseFloat(cfg.horimetroUltimaManutencao);
+  if(atual === null || isNaN(intervalo) || isNaN(ultimo)){
+    return {status:'sem_dados', atual, limite:null, restante:null};
+  }
+  const limite = ultimo + intervalo;
+  const restante = limite - atual;
+  let status = 'ok';
+  if(restante <= 0) status = 'vencido';
+  else if(restante <= 20) status = 'proximo';
+  return {status, atual, limite, restante};
+}
+
+function maintStatusLabel(status){
+  return {ok:'🟢 Em dia', proximo:'🟡 Próxima', vencido:'🔴 Vencida', sem_dados:'⚪ Sem dados'}[status] || status;
+}
+
+/* ===================== Numeração do talão: referência da máquina + dia + mês + ano(2 dígitos) + hora + minuto, sem nenhuma pontuação =====================
+   Ex: 94170820261338 = trator KH 94, gerado no dia 17/08/2026 às 13:38.
+   Totalmente automático: assim que a máquina é reconhecida, o número aparece sozinho e não pode ser
+   editado à mão. Não depende de nenhuma contagem guardada no aparelho — é calculado na hora, a partir
+   do relógio do próprio aparelho. Por isso nunca precisa sincronizar/exportar-importar entre aparelhos
+   pra evitar número repetido: é praticamente impossível duas pessoas iniciarem o MESMO trator no
+   mesmo minuto. */
+function findMaintConfig(tratorNome){
+  if(!tratorNome) return null;
+  const alvo = tratorNome.trim().toLowerCase();
+  return maintConfigs.find(c => c.trator && c.trator.trim().toLowerCase() === alvo) || null;
+}
+// Descobre a referência da máquina pra um trator/veículo digitado: usa o cadastro da Manutenção se
+// existir; senão tenta sugerir pela lista conhecida / padrão KH ##, M.0# (mesma lógica do cadastro).
+function resolveMachineRefForTractor(tratorNome){
+  const cfg = findMaintConfig(tratorNome);
+  if(cfg && cfg.machineRef) return cfg.machineRef;
+  return suggestMachineRef(tratorNome) || null;
+}
+// Número que APARECERIA agora — usado tanto pra sugestão na tela quanto pra exibição no card.
+function previewFormNumber(cfg){
+  if(!cfg || !cfg.machineRef) return null;
+  return buildAutoFormNumber(cfg.machineRef);
+}
+// Monta REF+DDMMYYHHmm a partir do relógio do aparelho no exato momento da chamada, sem pontuação.
+// O REF é usado sem zeros à esquerda (ex: "094" cadastrado -> aparece "94"), pra bater com o jeito
+// que a máquina é chamada no dia a dia (KH 94 -> 94). Ex: KH 97 no dia 24/08/26 às 07:32 -> "972408260732".
+// OBS: o ANO entra com só 2 dígitos (ex: 2026 -> "26"), então só repetiria pro mesmo trator no mesmo
+// dia+mês e mesmo horário (hora:minuto) em anos que terminam nos mesmos 2 dígitos (ex: 2026 e 2126)
+// — na prática, sem risco real de conflito.
+function buildAutoFormNumber(machineRef){
+  const d = new Date();
+  const refNum = String(parseInt(machineRef, 10));
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = String(d.getFullYear() % 100).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${refNum}${dd}${mm}${yy}${hh}${mi}`;
+}
+
+function resetMaintForm(){
+  document.getElementById('maint_editId').value = '';
+  document.getElementById('maint_trator').value = '';
+  document.getElementById('maint_intervalo').value = '';
+  document.getElementById('maint_ultimoHorimetro').value = '';
+  document.getElementById('maint_machineRef').value = '';
+  document.getElementById('maintFormTitle').textContent = 'Cadastrar equipamento';
+  document.getElementById('maint_cancelBtn').style.display = 'none';
+}
+
+// Ao digitar o trator num cadastro NOVO, sugere o número de referência automaticamente (só se o campo
+// ainda estiver vazio, pra não sobrescrever um valor que a pessoa já tenha ajustado na mão).
+function onMaintTractorInput(value){
+  const editId = document.getElementById('maint_editId').value;
+  const refField = document.getElementById('maint_machineRef');
+  if(!editId && !refField.value){
+    const sugestao = suggestMachineRef(value);
+    if(sugestao) refField.value = sugestao;
+  }
+}
+
+function editMaintConfig(id){
+  const cfg = maintConfigs.find(c=>c.id===id);
+  if(!cfg) return;
+  document.getElementById('maint_editId').value = cfg.id;
+  document.getElementById('maint_trator').value = cfg.trator;
+  document.getElementById('maint_intervalo').value = cfg.intervaloHoras || '';
+  document.getElementById('maint_ultimoHorimetro').value = cfg.horimetroUltimaManutencao || '';
+  document.getElementById('maint_machineRef').value = cfg.machineRef || '';
+  document.getElementById('maintFormTitle').textContent = 'Editar equipamento';
+  document.getElementById('maint_cancelBtn').style.display = 'inline-flex';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function saveMaintConfig(){
+  const trator = document.getElementById('maint_trator').value.trim();
+  const intervaloHoras = document.getElementById('maint_intervalo').value;
+  const horimetroUltimaManutencao = document.getElementById('maint_ultimoHorimetro').value;
+  const machineRefRaw = document.getElementById('maint_machineRef').value.trim();
+  if(!trator){
+    toast('Informe o trator/máquina.');
+    return;
+  }
+  if(machineRefRaw && !/^\d{1,3}$/.test(machineRefRaw)){
+    toast('O número de referência deve ter só dígitos (até 3).');
+    return;
+  }
+  const machineRef = machineRefRaw ? machineRefRaw.padStart(3, '0') : null;
+  if(machineRef && maintConfigs.some(c => c.machineRef === machineRef && c.trator.trim().toLowerCase() !== trator.toLowerCase())){
+    toast(`Esse número de referência (${machineRef}) já está em uso por outro equipamento — escolha outro, senão os talões vão colidir.`);
+    return;
+  }
+  const editId = document.getElementById('maint_editId').value;
+  if(editId){
+    const cfg = maintConfigs.find(c=>c.id===editId);
+    if(cfg){
+      cfg.trator = trator;
+      cfg.intervaloHoras = intervaloHoras;
+      cfg.horimetroUltimaManutencao = horimetroUltimaManutencao;
+      cfg.machineRef = machineRef;
+      cfg.alertSent = {proximo:false, vencido:false};
+      cfg.updatedAt = Date.now();
+    }
+  } else {
+    maintConfigs.push({
+      id: uid(),
+      trator, intervaloHoras, horimetroUltimaManutencao,
+      machineRef,
+      alertSent: {proximo:false, vencido:false},
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+  }
+  saveMaint(maintConfigs);
+  resetMaintForm();
+  renderMaintenance();
+  render();
+  toast('Equipamento salvo.');
+  checkMaintenanceAlerts();
+}
+
+function deleteMaintConfig(id){
+  if(!confirm('Remover este equipamento do controle de manutenção?')) return;
+  maintConfigs = maintConfigs.filter(c=>c.id!==id);
+  saveMaint(maintConfigs);
+  renderMaintenance();
+  render();
+}
+
+function markMaintDone(id){
+  const cfg = maintConfigs.find(c=>c.id===id);
+  if(!cfg) return;
+  const atual = getCurrentHorimetro(cfg.trator);
+  if(atual === null){
+    toast('Ainda não há registro de horímetro para este trator — informe o valor manualmente ao editar.');
+    return;
+  }
+  if(!confirm(`Confirmar manutenção feita agora, com horímetro ${atual}?`)) return;
+  cfg.horimetroUltimaManutencao = atual;
+  cfg.alertSent = {proximo:false, vencido:false};
+  cfg.updatedAt = Date.now();
+  saveMaint(maintConfigs);
+  renderMaintenance();
+  render();
+  toast('Manutenção registrada. Contagem zerada.');
+}
+
+function renderMaintenance(){
+  buildEquipDatalist();
+  const list = document.getElementById('maintList');
+  if(!list) return;
+  if(maintConfigs.length === 0){
+    list.innerHTML = '<div class="empty">Nenhum equipamento cadastrado ainda.</div>';
+    return;
+  }
+  const ordered = [...maintConfigs].sort((a,b)=>{
+    const sa = computeMaintStatus(a), sb = computeMaintStatus(b);
+    const peso = {vencido:0, proximo:1, sem_dados:2, ok:3};
+    return peso[sa.status] - peso[sb.status];
+  });
+  list.innerHTML = ordered.map(cfg=>{
+    const info = computeMaintStatus(cfg);
+    const temManutencaoConfigurada = cfg.intervaloHoras !== '' && cfg.intervaloHoras !== undefined && cfg.intervaloHoras !== null;
+    const restanteTxt = info.restante === null ? '—' : (info.restante <= 0
+      ? `vencida há ${Math.abs(info.restante).toFixed(1)} h`
+      : `faltam ${info.restante.toFixed(1)} h`);
+    const manutencaoHtml = temManutencaoConfigurada
+      ? `Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : info.atual}</b><br>
+         Intervalo: <b>${escapeHtml(String(cfg.intervaloHoras))} h</b> · Última manutenção em: <b>${escapeHtml(String(cfg.horimetroUltimaManutencao))}</b><br>
+         Próxima manutenção em: <b>${info.limite === null ? '—' : info.limite} (${restanteTxt})</b>`
+      : `Manutenção por horímetro: <b>não configurada</b> nesse equipamento.`;
+    const preview = previewFormNumber(cfg);
+    const numeracaoHtml = preview
+      ? `<br>📋 Exemplo de talão se iniciar agora: <b>${preview}</b> (referência ${cfg.machineRef})`
+      : `<br>📋 Numeração do talão: <b>número de referência não cadastrado</b>.`;
+    return `
+    <div class="maint-card st-${info.status}">
+      <div class="maint-card-head">
+        <div class="maint-card-title">🚜 ${escapeHtml(cfg.trator)}</div>
+        <span class="maint-status-pill st-${info.status}">${maintStatusLabel(info.status)}</span>
+      </div>
+      <div class="maint-card-meta">
+        ${manutencaoHtml}${numeracaoHtml}
+      </div>
+      <div class="maint-card-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editMaintConfig('${cfg.id}')">Editar</button>
+        ${temManutencaoConfigurada ? `<button class="btn btn-primary btn-sm" onclick="markMaintDone('${cfg.id}')">Manutenção feita agora</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="deleteMaintConfig('${cfg.id}')">Remover</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderMaintBanner(){
+  const el = document.getElementById('maintBanner');
+  if(!el) return;
+  const alerts = maintConfigs.map(cfg=>({cfg, info: computeMaintStatus(cfg)}))
+    .filter(x => x.info.status === 'proximo' || x.info.status === 'vencido')
+    .map(x => ({
+      cls: x.info.status === 'vencido' ? 'is-vencido' : 'is-proximo',
+      urgente: x.info.status === 'vencido',
+      html: `<b>🔧 ${x.info.status==='vencido' ? 'Manutenção vencida' : 'Manutenção se aproximando'} — ${escapeHtml(x.cfg.trator)}</b>${x.info.status === 'vencido' ? `vencida há ${Math.abs(x.info.restante).toFixed(1)} h` : `faltam ${x.info.restante.toFixed(1)} h`}`
+    }))
+    .sort((a,b)=> (a.urgente?0:1) - (b.urgente?0:1));
+  if(alerts.length === 0){ el.innerHTML = ''; return; }
+  el.innerHTML = alerts.map(a=>`<div class="maint-alert ${a.cls}" onclick="requestTab('maintenance')" style="cursor:pointer;">
+      <div>${a.html}</div>
+    </div>`).join('');
+}
+
+/* Envia o alerta de manutenção (Planner/Teams) uma vez por cruzamento de limite, e reenvia se falhar por falta de conexão.
+   force=true ignora o toggle de envio automático e o navigator.onLine (usado pelo botão manual). */
+function attemptSyncMaintenance(cfg, info, force){
+  if(!settings.webhookUrl) return null;
+  if(!force){
+    if(!settings.autoSync) return null;
+    if(!navigator.onLine) return null;
+  }
+  const vencido = info.status === 'vencido';
+  const texto = `🔧 *Manutenção ${vencido ? 'VENCIDA' : 'se aproximando'} — ${cfg.trator}*\n`
+    + `Horímetro atual: ${info.atual}\n`
+    + `Próxima manutenção prevista em: ${info.limite}\n`
+    + (vencido ? `Já passou ${Math.abs(info.restante).toFixed(1)} h do previsto.` : `Faltam aproximadamente ${info.restante.toFixed(1)} h.`);
+  return fetch(settings.webhookUrl, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      evento: 'manutencao_proxima',
+      vencido,
+      texto,
+      registro: {
+        trator: cfg.trator,
+        horimetroAtual: info.atual,
+        horimetroLimite: info.limite,
+        horasRestantes: info.restante
+      }
+    })
+  }).then(resp=>{
+    if(resp.ok){
+      cfg.alertSent[vencido ? 'vencido' : 'proximo'] = true;
+      if(vencido) cfg.alertSent.proximo = true;
+      saveMaint(maintConfigs);
+    }
+    return resp.ok;
+  }).catch(()=>false);
+}
+
+/* Mesmo esquema do alerta de manutenção, mas para o talão físico estar acabando/esgotado. */
+function checkMaintenanceAlerts(){
+  maintConfigs.forEach(cfg=>{
+    if(!cfg.alertSent) cfg.alertSent = {proximo:false, vencido:false};
+    const info = computeMaintStatus(cfg);
+    if(info.status === 'ok' || info.status === 'sem_dados'){
+      if(cfg.alertSent.proximo || cfg.alertSent.vencido){
+        cfg.alertSent = {proximo:false, vencido:false};
+        saveMaint(maintConfigs);
+      }
+    } else {
+      if(info.status === 'proximo' && !cfg.alertSent.proximo){
+        attemptSyncMaintenance(cfg, info);
+      }
+      if(info.status === 'vencido' && !cfg.alertSent.vencido){
+        attemptSyncMaintenance(cfg, info);
+      }
+    }
+  });
+  renderMaintBanner();
+  updatePendingSyncButton();
+}
+
+/* ===================== Utilidades ===================== */
+function sanitizeDecimalInput(el){
+  const cursorFromEnd = el.value.length - el.selectionEnd;
+  let v = el.value.replace(/,/g, '.');
+  v = v.replace(/[^0-9.]/g, '');
+  const firstDot = v.indexOf('.');
+  if(firstDot !== -1){
+    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '');
+  }
+  if(v !== el.value){
+    el.value = v;
+    const pos = Math.max(0, v.length - cursorFromEnd);
+    el.setSelectionRange(pos, pos);
+  }
+}
+function uid(){
+  return 'op_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+}
+function todayISO(){
+  const d = new Date();
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+function nowHM(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function fmtDateBR(iso){
+  if(!iso) return '[A CONFIRMAR]';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function parseISO(iso){
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function toISO(date){
+  return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+}
+function mondayOf(date){
+  const d = new Date(date);
+  const day = d.getDay(); // 0=domingo .. 6=sábado
+  const diff = (day === 0) ? -6 : (1 - day);
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function hoursWorked(hi, hf){
+  if(!hi || !hf) return '[A CONFIRMAR]';
+  const [h1,m1] = hi.split(':').map(Number);
+  const [h2,m2] = hf.split(':').map(Number);
+  let mins = (h2*60+m2) - (h1*60+m1);
+  if(mins < 0) mins += 24*60;
+  return `${Math.floor(mins/60)}h ${String(mins%60).padStart(2,'0')}min`;
+}
+function horimetroUsed(hi, hf){
+  if(hi === '' || hi === null || hi === undefined || hf === '' || hf === null || hf === undefined) return '[A CONFIRMAR]';
+  const v = (parseFloat(hf) - parseFloat(hi));
+  return isNaN(v) ? '[A CONFIRMAR]' : v.toFixed(1);
+}
+
+/* ===================== Render ===================== */
+function render(){
+  const list = document.getElementById('list');
+  let items = [...records].sort((a,b)=> b.createdAt - a.createdAt);
+
+  if(currentFilter === 'hoje') items = items.filter(r=>r.date === todayISO());
+  if(currentFilter === 'andamento') items = items.filter(r=>r.status === 'andamento');
+  if(currentFilter === 'concluido') items = items.filter(r=>r.status === 'concluido');
+
+  renderMaintBanner();
+  updatePendingSyncButton();
+
+  if(items.length === 0){
+    list.innerHTML = '<div class="empty">Nenhum registro aqui ainda.<br>Toque em "Iniciar Operação" para começar.</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(r=>{
+    const badge = r.status === 'andamento'
+      ? '<span class="badge badge-andamento">Em andamento</span>'
+      : '<span class="badge badge-concluido">Concluído</span>';
+    const temProblemaAtivo = !!(r.problema && !r.problema.resolvido);
+    const problemBadge = temProblemaAtivo ? '<span class="badge badge-problema">🔴 Parada / Problema</span>' : '';
+    const syncBadge = settings.webhookUrl
+      ? (r.synced ? '<span class="badge badge-sync">✔ sincronizado</span>' : '<span class="badge badge-sync">⏳ aguardando envio</span>')
+      : '';
+    const problemaBox = temProblemaAtivo
+      ? `<div class="problema-box">🔴 <b>Máquina parada</b> às ${new Date(r.problema.reportedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} — ${escapeHtml(r.problema.texto)}${r.problema.foto ? ' 📷' : ''}</div>`
+      : '';
+    return `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="op-title">${escapeHtml(r.operation||'Operação')} · ${escapeHtml(r.culture||'')}</div>
+          <div class="op-sub">${escapeHtml(r.farm||'')} — ${escapeHtml(r.plot||'')}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;">${badge}${problemBadge}</div>
+      </div>
+      <div class="card-meta">
+        <span>📅 <b>${fmtDateBR(r.date)}</b></span>
+        <span>👤 <b>${escapeHtml(r.operator||'-')}</b></span>
+        <span>🚜 <b>${escapeHtml(r.tractor||'-')}</b></span>
+        <span>⏱️ <b>${r.horaInicio||'--:--'} → ${r.horaFinal||'--:--'}</b></span>
+        ${syncBadge}
+      </div>
+      ${problemaBox}
+      <div class="card-actions">
+        ${r.status==='andamento' ? `<button class="btn btn-primary btn-sm" onclick="openFinishForm('${r.id}')">Finalizar</button>` : ''}
+        ${r.status==='andamento' && !temProblemaAtivo ? `<button class="btn btn-danger btn-sm" onclick="openProblemForm('${r.id}')">⚠️ Relatar Problema</button>` : ''}
+        ${temProblemaAtivo ? `<button class="btn btn-secondary btn-sm" onclick="resolveProblem('${r.id}')">✅ Marcar Resolvido</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="showTeamsText('${r.id}')">Gerar texto Teams</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteRecord('${r.id}')">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ===================== Formulário: Iniciar ===================== */
+function openStartForm(){
+  document.getElementById('formStart').reset();
+  document.getElementById('f_date').value = todayISO();
+  document.getElementById('f_horaInicio').value = nowHM();
+  PHOTO_KEYS.forEach(k => {
+    document.getElementById(`chk_verificado_${k}`).checked = false;
+    resetPhotoField(k, null);
+  });
+  document.getElementById('f_formNumber').value = '';
+  openModal('modalStart');
+}
+function setNow(fieldId){
+  document.getElementById(fieldId).value = nowHM();
+}
+function saveStart(){
+  const farm = document.getElementById('f_farm').value.trim();
+  const operator = document.getElementById('f_operator').value.trim();
+  const tractor = document.getElementById('f_tractor').value.trim();
+  if(!farm || !operator || !tractor){
+    toast('Preencha ao menos Fazenda, Operador e Trator.');
+    return;
+  }
+  const rec = {
+    id: uid(),
+    formNumber: document.getElementById('f_formNumber').value.trim(),
+    date: document.getElementById('f_date').value || todayISO(),
+    farm, operator, tractor,
+    plot: document.getElementById('f_plot').value.trim(),
+    culture: document.getElementById('f_culture').value.trim(),
+    operation: document.getElementById('f_operation').value.trim(),
+    implement: document.getElementById('f_implement').value.trim(),
+    horaInicio: document.getElementById('f_horaInicio').value,
+    horaFinal: '',
+    horimetroInicial: document.getElementById('f_horimetroInicial').value,
+    horimetroFinal: '',
+    fotos: {agua: pendingPhotos.agua, oleoMotor: pendingPhotos.oleoMotor, filtroAr: pendingPhotos.filtroAr, oleoHidraulico: pendingPhotos.oleoHidraulico},
+    checklist: {
+      agua: document.getElementById('chk_verificado_agua').checked,
+      oleoMotor: document.getElementById('chk_verificado_oleoMotor').checked,
+      filtroAr: document.getElementById('chk_verificado_filtroAr').checked,
+      oleoHidraulico: document.getElementById('chk_verificado_oleoHidraulico').checked
+    },
+    obs: '',
+    problema: null,
+    status: 'andamento',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    synced: false,
+    launched: false
+  };
+  records.push(rec);
+  const saved = saveRecords(records);
+  closeModal('modalStart');
+  render();
+  if(saved) toast('Operação iniciada e salva neste aparelho.');
+  attemptSync(rec, 'inicio');
+  checkMaintenanceAlerts();
+}
+
+/* ===================== Formulário: Finalizar ===================== */
+const PHOTO_KEYS = ['agua', 'oleoMotor', 'filtroAr', 'oleoHidraulico'];
+let pendingPhotos = {agua:null, oleoMotor:null, filtroAr:null, oleoHidraulico:null};
+
+function resetPhotoField(key, existingDataUrl){
+  pendingPhotos[key] = existingDataUrl || null;
+  const field = document.getElementById(`photoField_${key}`);
+  const tag = document.getElementById(`photoTag_${key}`);
+  // remove any existing preview row extras (keep the base button row)
+  const oldPreview = field.querySelector('.photo-thumb-wrap');
+  if(oldPreview) oldPreview.remove();
+  if(pendingPhotos[key]){
+    field.classList.add('is-done');
+    tag.textContent = 'OK ✔';
+    tag.className = 'photo-done-tag';
+    const wrap = document.createElement('div');
+    wrap.className = 'photo-thumb-wrap';
+    wrap.style.marginTop = '8px';
+    wrap.innerHTML = `<img src="${pendingPhotos[key]}" class="photo-thumb" onclick="window.open('${pendingPhotos[key]}','_blank')">`;
+    // insere a miniatura antes do checkbox "Foi verificado", para ele continuar sempre abaixo da foto
+    const verifiedRow = field.querySelector('.verified-row');
+    if(verifiedRow){ field.insertBefore(wrap, verifiedRow); } else { field.appendChild(wrap); }
+  } else {
+    field.classList.remove('is-done');
+    tag.textContent = 'Opcional';
+    tag.className = 'photo-optional-tag';
+  }
+}
+
+function capturePhoto(key, inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  const tag = document.getElementById(`photoTag_${key}`);
+  const originalTagHTML = tag ? tag.textContent : '';
+  if(tag){ tag.textContent = 'Processando...'; tag.className = 'photo-optional-tag'; }
+  let settled = false;
+  const failTimer = setTimeout(() => {
+    if(settled) return;
+    settled = true;
+    if(tag){ tag.textContent = originalTagHTML; }
+    toast('A foto demorou demais para processar. Tente novamente (foto pode estar muito grande).');
+  }, 12000);
+  const fail = (msg) => {
+    if(settled) return;
+    settled = true;
+    clearTimeout(failTimer);
+    if(tag){ tag.textContent = originalTagHTML; }
+    toast(msg);
+  };
+  const reader = new FileReader();
+  reader.onerror = () => fail('Não foi possível ler a foto. Tente tirar novamente.');
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onerror = () => fail('Foto em formato não suportado. Tente novamente ou ajuste a câmera do aparelho.');
+    img.onload = () => {
+      try{
+        const maxW = 640;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        if(settled) return;
+        settled = true;
+        clearTimeout(failTimer);
+        resetPhotoField(key, dataUrl);
+      }catch(err){
+        fail('Não foi possível processar a foto neste aparelho. Tente novamente.');
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  inputEl.value = '';
+}
+
+function openFinishForm(id){
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('fin_id').value = id;
+  document.getElementById('fin_horaFinal').value = nowHM();
+  document.getElementById('fin_horimetroFinal').value = '';
+  document.getElementById('fin_obs').value = '';
+  openModal('modalFinish');
+}
+function saveFinish(){
+  const id = document.getElementById('fin_id').value;
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+
+  r.horaFinal = document.getElementById('fin_horaFinal').value;
+  r.horimetroFinal = document.getElementById('fin_horimetroFinal').value;
+  r.obs = document.getElementById('fin_obs').value.trim();
+  r.status = 'concluido';
+  r.updatedAt = Date.now();
+  r.synced = false;
+  r.horimetroSynced = false;
+  const saved = saveRecords(records);
+  closeModal('modalFinish');
+  render();
+  if(saved) toast('Operação finalizada e salva neste aparelho.');
+  attemptSync(r, 'fechamento');
+  syncHorimetroAtualizado(r);
+  checkMaintenanceAlerts();
+}
+
+/* ===================== Relato de Problema (máquina parada no meio do serviço) ===================== */
+let pendingProblemPhoto = null;
+
+function captureProblemPhoto(inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  const tag = document.getElementById('photoTag_problema');
+  const originalTagHTML = tag ? tag.textContent : '';
+  if(tag){ tag.textContent = 'Processando...'; tag.className = 'photo-required-tag'; }
+  let settled = false;
+  const failTimer = setTimeout(() => {
+    if(settled) return;
+    settled = true;
+    if(tag){ tag.textContent = originalTagHTML; }
+    toast('A foto demorou demais para processar. Tente novamente (foto pode estar muito grande).');
+  }, 12000);
+  const fail = (msg) => {
+    if(settled) return;
+    settled = true;
+    clearTimeout(failTimer);
+    if(tag){ tag.textContent = originalTagHTML; }
+    toast(msg);
+  };
+  const reader = new FileReader();
+  reader.onerror = () => fail('Não foi possível ler a foto. Tente tirar novamente.');
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onerror = () => fail('Foto em formato não suportado. Tente novamente ou ajuste a câmera do aparelho.');
+    img.onload = () => {
+      try{
+        const maxW = 640;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        pendingProblemPhoto = canvas.toDataURL('image/jpeg', 0.6);
+        if(settled) return;
+        settled = true;
+        clearTimeout(failTimer);
+        const field = document.getElementById('photoField_problema');
+        const old = field.querySelector('.photo-thumb-wrap');
+        if(old) old.remove();
+        field.classList.add('is-done');
+        tag.textContent = 'Anexada ✔';
+        tag.className = 'photo-done-tag';
+        const wrap = document.createElement('div');
+        wrap.className = 'photo-thumb-wrap';
+        wrap.style.marginTop = '8px';
+        wrap.innerHTML = `<img src="${pendingProblemPhoto}" class="photo-thumb" onclick="window.open('${pendingProblemPhoto}','_blank')">`;
+        field.appendChild(wrap);
+      }catch(err){
+        fail('Não foi possível processar a foto neste aparelho. Tente novamente.');
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  inputEl.value = '';
+}
+
+function openProblemForm(id){
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('prob_id').value = id;
+  document.getElementById('prob_texto').value = '';
+  pendingProblemPhoto = null;
+  const field = document.getElementById('photoField_problema');
+  const tag = document.getElementById('photoTag_problema');
+  const old = field.querySelector('.photo-thumb-wrap');
+  if(old) old.remove();
+  field.classList.remove('is-done');
+  tag.textContent = 'Opcional';
+  tag.className = 'photo-optional-tag';
+  openModal('modalProblema');
+}
+
+function saveProblem(){
+  const id = document.getElementById('prob_id').value;
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+  const texto = document.getElementById('prob_texto').value.trim();
+  if(!texto){
+    toast('Descreva o que aconteceu.');
+    return;
+  }
+  r.problema = {
+    texto,
+    foto: pendingProblemPhoto,
+    reportedAt: Date.now(),
+    resolvido: false,
+    resolvedAt: null
+  };
+  r.updatedAt = Date.now();
+  r.synced = false;
+  const saved = saveRecords(records);
+  closeModal('modalProblema');
+  render();
+  renderWeek();
+  if(saved) toast('Problema relatado. O mesmo card do Teams será atualizado.');
+  attemptSync(r, 'problema');
+}
+
+function resolveProblem(id){
+  const r = records.find(x=>x.id===id);
+  if(!r || !r.problema) return;
+  r.problema.resolvido = true;
+  r.problema.resolvedAt = Date.now();
+  r.updatedAt = Date.now();
+  r.synced = false;
+  saveRecords(records);
+  render();
+  renderWeek();
+  toast('Problema marcado como resolvido.');
+  attemptSync(r, 'problema_resolvido');
+}
+
+function deleteRecord(id){
+  if(!confirm('Excluir este registro deste aparelho?')) return;
+  records = records.filter(r=>r.id!==id);
+  saveRecords(records);
+  render();
+}
+
+/* ===================== Texto para Teams (mesmo padrão da skill relatorio-operacao-agricola) ===================== */
+function buildProblemaBlock(r){
+  if(!r.problema) return '';
+  const hora = new Date(r.problema.reportedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  if(r.problema.resolvido){
+    const horaRes = r.problema.resolvedAt ? new Date(r.problema.resolvedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+    return `\n\n⚠️ Ocorrência registrada (já resolvida):\n* Relato às ${hora}: ${r.problema.texto}${r.problema.foto ? ' 📷 foto anexada' : ''}\n* Resolvido às ${horaRes}`;
+  }
+  return `\n\n🔴 MÁQUINA PARADA — PROBLEMA REPORTADO ÀS ${hora}\n* ${r.problema.texto}${r.problema.foto ? ' 📷 foto anexada' : ''}`;
+}
+function buildTeamsText(r){
+  const titulo = (norm(r.operation) + '_' + norm(r.culture)).toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'OPERACAO_AGRICOLA';
+
+  if(r.status === 'andamento'){
+    return `${titulo}
+🚜 REGISTRO DE OPERAÇÃO AGRÍCOLA
+1. Identificação da Operação:
+
+* Nº do Formulário: ${r.formNumber || 'N/A'}
+* Fazenda: ${r.farm}
+* Talhão: ${r.plot || '[A CONFIRMAR]'}
+* Data: ${fmtDateBR(r.date)}
+* Cultura: ${r.culture || '[A CONFIRMAR]'}
+* Operação: ${r.operation || '[A CONFIRMAR]'}
+
+2. Equipe e Equipamento:
+
+* Operador: ${r.operator}
+* Trator: ${r.tractor}
+* Implementos: ${r.implement || '[A CONFIRMAR]'}
+
+⏱️ Hora Início: ${r.horaInicio || '[A CONFIRMAR]'}
+🔧 Horímetro Inicial: ${r.horimetroInicial || '[A CONFIRMAR]'} — operação em andamento${buildProblemaBlock(r)}`;
+  }
+
+  const chk = r.checklist || {};
+  return `${titulo}
+🚜 REGISTRO DE OPERAÇÃO AGRÍCOLA
+1. Identificação da Operação:
+
+* Nº do Formulário: ${r.formNumber || 'N/A'}
+* Fazenda: ${r.farm}
+* Talhão: ${r.plot || '[A CONFIRMAR]'}
+* Data: ${fmtDateBR(r.date)}
+* Cultura: ${r.culture || '[A CONFIRMAR]'}
+* Operação: ${r.operation || '[A CONFIRMAR]'}
+
+2. Equipe e Equipamento:
+
+* Operador: ${r.operator}
+* Trator: ${r.tractor}
+* Implementos: ${r.implement || '[A CONFIRMAR]'}
+
+3. Horários e Horímetro:
+
+* Hora Início: ${r.horaInicio || '[A CONFIRMAR]'}
+* Hora Final: ${r.horaFinal || '[A CONFIRMAR]'}
+* Horas Trabalhadas: ${hoursWorked(r.horaInicio, r.horaFinal)}
+* Horímetro Inicial: ${r.horimetroInicial || '[A CONFIRMAR]'}
+* Horímetro Final: ${r.horimetroFinal || '[A CONFIRMAR]'}
+* Horímetro Utilizado: ${horimetroUsed(r.horimetroInicial, r.horimetroFinal)}
+
+4. Checklist de Manutenção:
+
+* ${chk.agua ? '(X)' : '( )'} Água / Líquido de Arrefecimento ${r.fotos && r.fotos.agua ? '📷 foto anexada' : ''}
+* ${chk.oleoMotor ? '(X)' : '( )'} Óleo Motor (vareta) ${r.fotos && r.fotos.oleoMotor ? '📷 foto anexada' : ''}
+* ${chk.filtroAr ? '(X)' : '( )'} Filtro de Ar ${r.fotos && r.fotos.filtroAr ? '📷 foto anexada' : ''}
+* ${chk.oleoHidraulico ? '(X)' : '( )'} Óleo Hidráulico ${r.fotos && r.fotos.oleoHidraulico ? '📷 foto anexada' : ''}
+
+5. Observações:
+
+* ${r.obs ? r.obs : 'Nenhuma observação registrada.'}${buildProblemaBlock(r)}`;
+}
+function norm(s){
+  return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+let teamsTextCurrentId = null;
+function showTeamsText(id){
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+  teamsTextCurrentId = id;
+  document.getElementById('teamsTextBox').textContent = buildTeamsText(r);
+
+  const photosBox = document.getElementById('teamsPhotosBox');
+  const labels = {agua:'Arrefecimento', oleoMotor:'Óleo Motor', filtroAr:'Filtro de Ar', oleoHidraulico:'Óleo Hidráulico'};
+  let photosHtml = '';
+  if(r.fotos && (r.fotos.agua || r.fotos.oleoMotor || r.fotos.filtroAr || r.fotos.oleoHidraulico)){
+    photosHtml += `
+      <div class="photos-view-label">📷 Fotos do checklist:</div>
+      <div class="photos-view-grid">
+        ${PHOTO_KEYS.filter(k => r.fotos[k]).map(k => `
+          <div style="text-align:center;">
+            <img src="${r.fotos[k]}" onclick="window.open('${r.fotos[k]}','_blank')">
+            <div style="font-size:10px;color:var(--gray-700);margin-top:2px;">${labels[k]}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+  if(r.problema && r.problema.foto){
+    photosHtml += `
+      <div class="photos-view-label">📷 Foto do problema relatado:</div>
+      <div class="photos-view-grid">
+        <div style="text-align:center;">
+          <img src="${r.problema.foto}" onclick="window.open('${r.problema.foto}','_blank')">
+          <div style="font-size:10px;color:var(--gray-700);margin-top:2px;">Problema</div>
+        </div>
+      </div>`;
+  }
+  photosBox.innerHTML = photosHtml;
+
+  openModal('modalTeams');
+}
+function copyTeamsText(){
+  const text = document.getElementById('teamsTextBox').textContent;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>toast('Texto copiado!')).catch(()=>fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); toast('Texto copiado!'); }
+  catch(e){ toast('Não foi possível copiar automaticamente. Selecione o texto manualmente.'); }
+  document.body.removeChild(ta);
+}
+
+/* ===================== Sincronização best-effort com Teams (webhook / Power Automate) ===================== */
+// force=true ignora o toggle "Tentar envio automático" e o navigator.onLine (usado pelo botão manual
+// "Enviar pendências agora" — útil quando a detecção de conexão do aparelho não é confiável no campo).
+function attemptSync(record, eventType, force){
+  if(!settings.webhookUrl) return null;
+  if(!force){
+    if(!settings.autoSync) return null;
+    if(!navigator.onLine) return null;
+  }
+  return fetch(settings.webhookUrl, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      evento: eventType,
+      texto: buildTeamsText(record),
+      registro: record
+    })
+  }).then(resp=>{
+    if(resp.ok){
+      record.synced = true;
+      saveRecords(records);
+      render();
+    }
+    return resp.ok;
+  }).catch(()=>false);
+}
+// Best-effort: avisa o fluxo "Cadastro e Alerta de Manutencao" sempre que uma operação é finalizada,
+// pra atualizar o horímetro atual do trator no SharePoint (não importa o aparelho/operador) e disparar
+// o aviso no Teams quando a manutenção estiver próxima/vencida. Não tem fila de reenvio: se falhar por
+// falta de internet, o próximo registro finalizado (neste ou em outro aparelho) já manda o horímetro
+// mais atual, então não fica desatualizado por muito tempo.
+function syncHorimetroAtualizado(record, force){
+  if(!settings.webhookUrlManut) return null;
+  if(!record.tractor || record.horimetroFinal === '' || record.horimetroFinal === undefined || record.horimetroFinal === null) return null;
+  if(record.horimetroSynced && !force) return null;
+  if(!force && !navigator.onLine) return null;
+  return fetch(settings.webhookUrlManut, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      evento: 'horimetro_atualizado',
+      trator: record.tractor,
+      horimetroFinal: record.horimetroFinal
+    })
+  }).then(resp=>{
+    if(resp.ok){
+      record.horimetroSynced = true;
+      saveRecords(records);
+    }
+    return resp.ok;
+  }).catch(()=>false);
+}
+function retryPendingSyncs(){
+  if(!navigator.onLine) return;
+  if(settings.webhookUrl && settings.autoSync){
+    records.filter(r=>!r.synced).forEach(r=>{
+      let evento = r.status === 'andamento' ? 'inicio' : 'fechamento';
+      if(r.problema && !r.problema.resolvido) evento = 'problema';
+      else if(r.problema && r.problema.resolvido) evento = 'problema_resolvido';
+      attemptSync(r, evento);
+    });
+  }
+  if(settings.webhookUrlManut){
+    records.filter(r=>r.status==='concluido' && !r.horimetroSynced).forEach(r=>syncHorimetroAtualizado(r));
+  }
+}
+
+function pendingMaintAlerts(){
+  return maintConfigs.filter(cfg=>{
+    if(!cfg.alertSent) cfg.alertSent = {proximo:false, vencido:false};
+    const info = computeMaintStatus(cfg);
+    return (info.status === 'proximo' && !cfg.alertSent.proximo) || (info.status === 'vencido' && !cfg.alertSent.vencido);
+  });
+}
+
+function pendingHorimetroSyncs(){
+  if(!settings.webhookUrlManut) return [];
+  return records.filter(r=>r.status==='concluido' && !r.horimetroSynced);
+}
+
+function updatePendingSyncButton(){
+  const row = document.getElementById('pendingSyncRow');
+  const btn = document.getElementById('pendingSyncBtn');
+  if(!row || !btn) return;
+  if(!settings.webhookUrl && !settings.webhookUrlManut){ row.style.display = 'none'; return; }
+  const pendingRecords = settings.webhookUrl ? records.filter(r=>!r.synced).length : 0;
+  const total = pendingRecords + pendingMaintAlerts().length + pendingHorimetroSyncs().length;
+  if(total === 0){ row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  btn.textContent = `📤 Enviar pendências agora (${total})`;
+}
+
+// Envio manual, forçado: tenta enviar mesmo que "envio automático" esteja desligado ou o
+// aparelho ache que está offline — cobre o caso do sinal ser instável no campo.
+function manualSendPending(){
+  if(!settings.webhookUrl && !settings.webhookUrlManut){
+    toast('Configure uma URL de automação na aba Ajustes antes de enviar.');
+    return;
+  }
+  const pendingRecords = settings.webhookUrl ? records.filter(r=>!r.synced) : [];
+  const pendingMaint = pendingMaintAlerts();
+  const pendingHorimetro = pendingHorimetroSyncs();
+  const total = pendingRecords.length + pendingMaint.length + pendingHorimetro.length;
+  if(total === 0){
+    toast('Nada pendente para enviar agora.');
+    return;
+  }
+  toast(`Tentando enviar ${total} pendência(s)...`);
+  const promises = [];
+  pendingRecords.forEach(r=>{
+    let evento = r.status === 'andamento' ? 'inicio' : 'fechamento';
+    if(r.problema && !r.problema.resolvido) evento = 'problema';
+    else if(r.problema && r.problema.resolvido) evento = 'problema_resolvido';
+    promises.push(attemptSync(r, evento, true));
+  });
+  pendingMaint.forEach(cfg=>{
+    const info = computeMaintStatus(cfg);
+    promises.push(attemptSyncMaintenance(cfg, info, true));
+  });
+  pendingHorimetro.forEach(r=>{
+    promises.push(syncHorimetroAtualizado(r, true));
+  });
+  Promise.all(promises).then(results=>{
+    const ok = results.filter(Boolean).length;
+    render();
+    renderMaintenance();
+    if(ok === total) toast(`Pronto: ${ok} de ${total} enviado(s) com sucesso.`);
+    else if(ok === 0) toast(`Não consegui enviar agora (${total} pendente(s)) — provavelmente sem internet de verdade. Tente novamente mais tarde.`);
+    else toast(`${ok} de ${total} enviado(s). O restante continua sem internet — tente de novo depois.`);
+  });
+}
+window.addEventListener('online', ()=>{ updateConnStatus(); retryPendingSyncs(); checkMaintenanceAlerts(); });
+window.addEventListener('offline', updateConnStatus);
+function updateConnStatus(){
+  const el = document.getElementById('connStatus');
+  if(navigator.onLine){
+    el.className = 'status-pill status-online';
+    el.innerHTML = '<span class="dot"></span> online';
+  } else {
+    el.className = 'status-pill status-offline';
+    el.innerHTML = '<span class="dot"></span> offline · dados salvos no aparelho';
+  }
+}
+
+/* ===================== Painel semanal (buckets Segunda a Domingo) ===================== */
+const DAY_LABELS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+let weekOffset = 0;
+let hideLaunched = false;
+
+function toggleHideLaunched(){
+  hideLaunched = !hideLaunched;
+  document.getElementById('hideLaunchedChip').classList.toggle('active', hideLaunched);
+  renderWeek();
+}
+
+function weekNav(delta, reset){
+  weekOffset = reset ? 0 : weekOffset + delta;
+  renderWeek();
+}
+
+function toggleLaunched(id, val){
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+  r.launched = val;
+  saveRecords(records);
+  renderWeek();
+}
+
+function weekCardHtml(r){
+  const badge = r.status === 'andamento'
+    ? '<span class="badge badge-andamento">Em andamento</span>'
+    : '<span class="badge badge-concluido">Concluído</span>';
+  const temProblemaAtivo = !!(r.problema && !r.problema.resolvido);
+  const problemBadge = temProblemaAtivo ? '<span class="badge badge-problema">🔴 Parada</span>' : '';
+  return `
+    <div class="week-card ${r.launched ? 'is-launched' : ''} ${temProblemaAtivo ? 'has-problema' : ''}">
+      <div class="week-card-title">${escapeHtml(r.operation||'Operação')} · ${escapeHtml(r.culture||'')}</div>
+      <div class="week-card-sub">${escapeHtml(r.plot||'')}${r.plot && r.farm ? ' — ' : ''}${escapeHtml(r.farm||'')}</div>
+      <div class="week-card-meta">
+        <span>🚜 <b>${escapeHtml(r.tractor||'-')}</b></span>
+        <span>👤 <b>${escapeHtml(r.operator||'-')}</b></span>
+        <span>⏱️ ${r.horaInicio||'--:--'} → ${r.horaFinal||'--:--'}</span>
+      </div>
+      <div style="margin-top:6px;">${badge} ${problemBadge}</div>
+      ${temProblemaAtivo ? `<div class="problema-box" style="margin-top:8px;margin-bottom:0;">🔴 ${escapeHtml(r.problema.texto)}</div>` : ''}
+      <label class="week-launched-toggle">
+        <input type="checkbox" ${r.launched ? 'checked' : ''} onchange="toggleLaunched('${r.id}', this.checked)">
+        Lançado no Ruraltec Agro
+      </label>
+      <div class="week-card-actions">
+        <button class="btn btn-ghost btn-sm" onclick="showTeamsText('${r.id}')">Ver dados p/ lançar</button>
+      </div>
+    </div>`;
+}
+
+function renderWeek(){
+  const start = mondayOf(parseISO(todayISO()));
+  start.setDate(start.getDate() + weekOffset*7);
+  const today = todayISO();
+
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const iso = toISO(d);
+    days.push({ iso, label: DAY_LABELS[i], dateBR: fmtDateBR(iso) });
+  }
+
+  document.getElementById('weekLabel').textContent = `Semana de ${days[0].dateBR} a ${days[6].dateBR}`;
+
+  const board = document.getElementById('weekBoard');
+  board.innerHTML = days.map(day => {
+    let dayRecords = records.filter(r => r.date === day.iso);
+    if(hideLaunched) dayRecords = dayRecords.filter(r => !r.launched);
+    dayRecords.sort((a,b) => (a.horaInicio||'').localeCompare(b.horaInicio||''));
+    const bodyHtml = dayRecords.length
+      ? dayRecords.map(weekCardHtml).join('')
+      : '<div class="week-empty">Sem operações</div>';
+    return `
+      <div class="week-col ${day.iso === today ? 'is-today' : ''}">
+        <div class="week-col-header">
+          <div>${day.label}</div>
+          <div class="week-col-date">${day.dateBR}</div>
+        </div>
+        <div class="week-col-body">${bodyHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+/* ===================== Modais / navegação ===================== */
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+document.getElementById('filterRow').addEventListener('click', (e)=>{
+  const chip = e.target.closest('.chip');
+  if(!chip) return;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  currentFilter = chip.dataset.filter;
+  render();
+});
+
+function switchTab(tab){
+  document.getElementById('viewHome').style.display = tab==='home' ? 'block' : 'none';
+  document.getElementById('viewWeek').style.display = tab==='week' ? 'block' : 'none';
+  document.getElementById('viewMaintenance').style.display = tab==='maintenance' ? 'block' : 'none';
+  document.getElementById('viewSettings').style.display = tab==='settings' ? 'block' : 'none';
+  document.getElementById('tabHome').classList.toggle('active', tab==='home');
+  document.getElementById('tabWeek').classList.toggle('active', tab==='week');
+  document.getElementById('tabMaintenance').classList.toggle('active', tab==='maintenance');
+  document.getElementById('tabSettings').classList.toggle('active', tab==='settings');
+  document.getElementById('mainEl').classList.toggle('wide', tab==='week');
+  if(tab==='settings'){
+    document.getElementById('webhookUrl').value = settings.webhookUrl || '';
+    document.getElementById('webhookUrlManut').value = settings.webhookUrlManut || '';
+    document.getElementById('autoSyncToggle').checked = !!settings.autoSync;
+    renderSecurityBlock();
+  }
+  if(tab==='week'){
+    renderWeek();
+  }
+  if(tab==='maintenance'){
+    resetMaintForm();
+    renderMaintenance();
+  }
+}
+function saveSettings(){
+  settings.webhookUrl = document.getElementById('webhookUrl').value.trim();
+  settings.webhookUrlManut = document.getElementById('webhookUrlManut').value.trim();
+  settings.autoSync = document.getElementById('autoSyncToggle').checked;
+  saveSettingsObj(settings);
+  toast('Ajustes salvos.');
+  retryPendingSyncs();
+  updatePendingSyncButton();
+}
+
+/* ===================== Senha (PIN) de acesso às abas Manutenção/Ajustes ===================== */
+// Bloqueio simples do lado do aparelho (não é criptografia). Protege contra acesso casual de quem
+// pega o celular emprestado, não é segurança de verdade. Senha fica salva neste aparelho apenas.
+const PIN_LENGTH = 4;
+let pinBuffer = '';
+let pinMode = null;       // 'gate' | 'verifyCurrent' | 'setNew1' | 'setNew2'
+let pinPendingTab = null; // aba que deve abrir depois de um 'gate' bem-sucedido
+let pinPendingAction = null; // 'change' | 'remove' — o que fazer depois de um 'verifyCurrent' bem-sucedido
+let pinFirstEntry = '';
+
+function requestTab(tab){
+  if((tab === 'settings' || tab === 'maintenance') && settings.adminPin){
+    pinPendingTab = tab;
+    pinMode = 'gate';
+    pinBuffer = '';
+    setPinTitle('Digite a senha');
+    setPinError('');
+    updatePinDots();
+    openModal('modalPin');
+  } else {
+    switchTab(tab);
+  }
+}
+function closePinModal(){
+  closeModal('modalPin');
+  pinMode = null; pinBuffer = ''; pinPendingTab = null; pinPendingAction = null; pinFirstEntry = '';
+}
+function setPinTitle(t){ document.getElementById('pinModalTitle').textContent = t; }
+function setPinError(t){ document.getElementById('pinError').textContent = t; }
+function updatePinDots(){
+  const dots = document.querySelectorAll('#pinDots .pin-dot');
+  dots.forEach((d,i) => d.classList.toggle('filled', i < pinBuffer.length));
+}
+function pinKeyPress(digit){
+  if(pinBuffer.length >= PIN_LENGTH) return;
+  pinBuffer += String(digit);
+  updatePinDots();
+  if(pinBuffer.length === PIN_LENGTH){
+    setTimeout(handlePinComplete, 150);
+  }
+}
+function pinBackspace(){
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+}
+function handlePinComplete(){
+  const entered = pinBuffer;
+  if(pinMode === 'gate'){
+    if(entered === settings.adminPin){
+      closeModal('modalPin');
+      const tab = pinPendingTab;
+      pinMode = null; pinBuffer = ''; pinPendingTab = null;
+      switchTab(tab);
+    } else {
+      setPinError('Senha incorreta.');
+      pinBuffer = ''; updatePinDots();
+    }
+  } else if(pinMode === 'verifyCurrent'){
+    if(entered === settings.adminPin){
+      if(pinPendingAction === 'remove'){
+        settings.adminPin = '';
+        saveSettingsObj(settings);
+        closePinModal();
+        toast('Senha removida.');
+        renderSecurityBlock();
+      } else if(pinPendingAction === 'change'){
+        pinMode = 'setNew1';
+        pinBuffer = '';
+        setPinTitle('Digite a nova senha');
+        setPinError('');
+        updatePinDots();
+      }
+    } else {
+      setPinError('Senha atual incorreta.');
+      pinBuffer = ''; updatePinDots();
+    }
+  } else if(pinMode === 'setNew1'){
+    pinFirstEntry = entered;
+    pinMode = 'setNew2';
+    pinBuffer = '';
+    setPinTitle('Confirme a nova senha');
+    setPinError('');
+    updatePinDots();
+  } else if(pinMode === 'setNew2'){
+    if(entered === pinFirstEntry){
+      settings.adminPin = entered;
+      saveSettingsObj(settings);
+      closePinModal();
+      toast('Senha definida.');
+      renderSecurityBlock();
+    } else {
+      setPinError('As senhas não coincidem. Digite de novo.');
+      pinMode = 'setNew1';
+      pinBuffer = '';
+      pinFirstEntry = '';
+      setPinTitle('Digite a nova senha');
+      updatePinDots();
+    }
+  }
+}
+function openPinSetFlow(){
+  pinBuffer = ''; pinFirstEntry = '';
+  if(settings.adminPin){
+    pinMode = 'verifyCurrent';
+    pinPendingAction = 'change';
+    setPinTitle('Digite a senha atual');
+  } else {
+    pinMode = 'setNew1';
+    setPinTitle('Digite a nova senha');
+  }
+  setPinError('');
+  updatePinDots();
+  openModal('modalPin');
+}
+function openPinRemoveFlow(){
+  if(!settings.adminPin) return;
+  pinBuffer = '';
+  pinMode = 'verifyCurrent';
+  pinPendingAction = 'remove';
+  setPinTitle('Digite a senha atual');
+  setPinError('');
+  updatePinDots();
+  openModal('modalPin');
+}
+function renderSecurityBlock(){
+  const has = !!settings.adminPin;
+  const statusEl = document.getElementById('securityStatus');
+  if(statusEl) statusEl.textContent = has ? '🔒 Senha ativa neste aparelho' : '🔓 Nenhuma senha definida';
+  const setBtn = document.getElementById('btnSetPin');
+  if(setBtn) setBtn.textContent = has ? 'Alterar senha' : 'Definir senha';
+  const removeBtn = document.getElementById('btnRemovePin');
+  if(removeBtn) removeBtn.style.display = has ? 'inline-block' : 'none';
+}
+
+/* ===================== Numeração automática do talão (referência+dia/mês/ano2/hora/minuto, sem pontuação — ver buildAutoFormNumber) ===================== */
+// Chamado quando o campo "Trator" muda no formulário de Iniciar Operação: reconhece a máquina e
+// gera o número do talão na hora (o talão pertence ao trator/veículo, não ao operador). Campo é
+// só-leitura — não existe mais edição manual do número.
+function onTractorFieldChange(value){
+  const field = document.getElementById('f_formNumber');
+  const ref = resolveMachineRefForTractor(value);
+  field.value = ref ? buildAutoFormNumber(ref) : '';
+}
+
+/* ===================== Backup / restauração ===================== */
+function exportData(){
+  // Exporta registros + cadastro de equipamentos da Manutenção (referência da máquina, intervalo
+  // de manutenção etc.), pra facilitar levar esse cadastro de um aparelho pra outro se precisar.
+  const payload = { version: 2, exportedAt: new Date().toISOString(), records, maintConfigs };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `operacoes_agrohama_${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importData(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const imported = JSON.parse(reader.result);
+      let importedRecords, importedMaint;
+      if(Array.isArray(imported)){
+        // arquivo antigo (só registros, sem configuração de manutenção)
+        importedRecords = imported;
+        importedMaint = [];
+      } else if(imported && typeof imported === 'object'){
+        importedRecords = Array.isArray(imported.records) ? imported.records : [];
+        importedMaint = Array.isArray(imported.maintConfigs) ? imported.maintConfigs : [];
+      } else {
+        throw new Error('formato inválido');
+      }
+
+      const existingIds = new Set(records.map(r=>r.id));
+      let added = 0;
+      importedRecords.forEach(r=>{
+        if(r && r.id && !existingIds.has(r.id)){ records.push(r); added++; }
+      });
+      saveRecords(records);
+
+      // Mescla o cadastro de equipamentos da Manutenção (referência da máquina, intervalo de
+      // manutenção etc.) — útil pra levar o cadastro feito num aparelho para os outros, sem precisar
+      // recadastrar cada trator/veículo em todo celular. A numeração do talão em si (ref+dia/mês/ano2/hora/minuto)
+      // não depende disso — é calculada na hora, sempre local (ver ressalva de colisão em buildAutoFormNumber).
+      let maintUpdated = 0;
+      importedMaint.forEach(imp=>{
+        if(!imp || !imp.trator) return;
+        const existing = findMaintConfig(imp.trator);
+        if(!existing){
+          maintConfigs.push(imp);
+          maintUpdated++;
+        } else {
+          if(!existing.machineRef && imp.machineRef) existing.machineRef = imp.machineRef;
+          if(imp.intervaloHoras != null && (existing.updatedAt||0) < (imp.updatedAt||0)) existing.intervaloHoras = imp.intervaloHoras;
+          if(imp.horimetroUltimaManutencao != null && (existing.updatedAt||0) < (imp.updatedAt||0)) existing.horimetroUltimaManutencao = imp.horimetroUltimaManutencao;
+        }
+      });
+      if(maintUpdated) saveMaint(maintConfigs);
+
+      render();
+      let msg = `${added} registro(s) importado(s).`;
+      if(maintUpdated) msg += ` Cadastro de ${maintUpdated} equipamento(s) sincronizado.`;
+      toast(msg);
+    }catch(e){
+      toast('Arquivo inválido.');
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+function clearAll(){
+  if(!confirm('Isso vai apagar TODOS os registros salvos neste aparelho. Tem certeza?')) return;
+  records = [];
+  saveRecords(records);
+  render();
+  toast('Todos os registros foram apagados.');
+}
+
+/* ===================== Init ===================== */
+updateConnStatus();
+buildEquipDatalist();
+render();
+checkMaintenanceAlerts();
+updatePendingSyncButton();
+
+/* ===================== PWA: service worker (offline + atualização automática) =====================
+   Assim que houver internet, o app busca sozinho a versão mais nova publicada no GitHub Pages,
+   instala em segundo plano e recarrega a tela uma vez pra aplicar — sem precisar desinstalar/
+   reinstalar nada no celular. Sem internet, continua funcionando normalmente com a última versão
+   que já tinha sido baixada. */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if(!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+            toast('Nova versão do app encontrada — atualizando...');
+            setTimeout(() => window.location.reload(), 1200);
+          }
+        });
+      });
+      // Verifica se há atualização toda vez que o app volta a ficar visível (ex: usuário abre o
+      // celular de novo depois de um tempo), sem precisar fechar e abrir o app.
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') reg.update().catch(()=>{});
+      });
+    }).catch(()=>{ /* segue funcionando normalmente mesmo se o service worker falhar */ });
+  });
+  let swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(swRefreshing) return;
+    swRefreshing = true;
+    window.location.reload();
+  });
+}
+</script>
+</body>
+</html>
