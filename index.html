@@ -680,6 +680,15 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modalHorimetroLembrete">
+  <div class="modal">
+    <div class="modal-title">⏰ Não esqueça de fechar o horímetro!</div>
+    <div class="hint" style="margin-bottom:10px;">As operações abaixo ainda estão em aberto. Finalize e registre o horímetro final assim que possível:</div>
+    <div id="horimetroLembreteLista" style="margin-bottom:14px;"></div>
+    <button class="btn btn-danger btn-block" onclick="ackHorimetroLembrete()">Ok, entendi</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2184,12 +2193,85 @@ function clearAll(){
   toast('Todos os registros foram apagados.');
 }
 
+/* ===================== Lembrete de horímetro em aberto (16h / 17h) =====================
+   Enquanto o app estiver aberto (ou toda vez que for reaberto), verifica se já passou de algum
+   dos horários abaixo e se existe operação "em andamento" sem fechar. Se sim, mostra um aviso
+   que fica insistindo — som + vibração repetindo — até a pessoa tocar em "Ok, entendi".
+   Cada horário só lembra uma vez por dia depois de confirmado; se a operação continuar aberta
+   no horário seguinte, lembra de novo.
+   IMPORTANTE: isso só funciona enquanto o app está aberto no celular (mesmo que em segundo
+   plano por pouco tempo) — como é um app instalado via navegador (PWA), ele não consegue
+   "acordar" o celular sozinho com uma notificação se estiver completamente fechado. Se quiser
+   um alarme de verdade que toque mesmo com o app fechado, é um recurso à parte (notificação push),
+   bem mais trabalhoso de configurar. */
+const HORIMETRO_LEMBRETE_HORARIOS = ['16:00', '17:00'];
+const HORIMETRO_LEMBRETE_KEY = 'agrohama_lembrete_horimetro_v1';
+let horimetroLembreteAtivo = null;
+let horimetroLembreteInterval = null;
+
+function getHorimetroLembreteAck(){
+  try{ return JSON.parse(localStorage.getItem(HORIMETRO_LEMBRETE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function setHorimetroLembreteAck(obj){
+  try{ localStorage.setItem(HORIMETRO_LEMBRETE_KEY, JSON.stringify(obj)); }catch(e){}
+}
+function tocarBipLembrete(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 880;
+    gain.gain.value = 0.15;
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    setTimeout(()=>{ osc.stop(); ctx.close(); }, 250);
+  }catch(e){ /* aparelho sem suporte a áudio — sem problema, segue só a vibração */ }
+  if(navigator.vibrate) navigator.vibrate([300,150,300]);
+}
+function checkHorimetroLembrete(){
+  const abertas = records.filter(r=>r.status==='andamento');
+  if(abertas.length === 0) return;
+  const hoje = todayISO();
+  const ack = getHorimetroLembreteAck();
+  if(ack.data !== hoje){ ack.data = hoje; ack.horarios = []; }
+  const agora = nowHM();
+  const horarioPendente = HORIMETRO_LEMBRETE_HORARIOS.find(h => agora >= h && !(ack.horarios||[]).includes(h));
+  if(!horarioPendente) return;
+  if(horimetroLembreteAtivo === horarioPendente) return; // esse aviso já está na tela
+  horimetroLembreteAtivo = horarioPendente;
+  const lista = abertas.slice(0,6).map(r =>
+    `• <b>${escapeHtml(r.tractor||'—')}</b> — iniciada às ${escapeHtml(r.horaInicio||'?')} (${escapeHtml(r.farm||'')})`
+  ).join('<br>');
+  document.getElementById('horimetroLembreteLista').innerHTML = lista || 'Operação em aberto.';
+  openModal('modalHorimetroLembrete');
+  tocarBipLembrete();
+  if(horimetroLembreteInterval) clearInterval(horimetroLembreteInterval);
+  horimetroLembreteInterval = setInterval(tocarBipLembrete, 4000);
+}
+function ackHorimetroLembrete(){
+  if(horimetroLembreteInterval){ clearInterval(horimetroLembreteInterval); horimetroLembreteInterval = null; }
+  const hoje = todayISO();
+  const ack = getHorimetroLembreteAck();
+  if(ack.data !== hoje){ ack.data = hoje; ack.horarios = []; }
+  if(horimetroLembreteAtivo && !ack.horarios.includes(horimetroLembreteAtivo)) ack.horarios.push(horimetroLembreteAtivo);
+  setHorimetroLembreteAck(ack);
+  horimetroLembreteAtivo = null;
+  closeModal('modalHorimetroLembrete');
+}
+
 /* ===================== Init ===================== */
 updateConnStatus();
 buildEquipDatalist();
 render();
 checkMaintenanceAlerts();
 updatePendingSyncButton();
+checkHorimetroLembrete();
+setInterval(checkHorimetroLembrete, 30000);
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') checkHorimetroLembrete();
+});
 
 /* ===================== PWA: service worker (offline + atualização automática) =====================
    Assim que houver internet, o app busca sozinho a versão mais nova publicada no GitHub Pages,
