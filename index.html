@@ -1679,12 +1679,20 @@ function fallbackCopy(text){
 /* ===================== Sincronização best-effort com Teams (webhook / Power Automate) ===================== */
 // force=true ignora o toggle "Tentar envio automático" e o navigator.onLine (usado pelo botão manual
 // "Enviar pendências agora" — útil quando a detecção de conexão do aparelho não é confiável no campo).
+// Trava contra envio duplicado: evita que o MESMO registro seja mandado duas vezes ao mesmo tempo
+// pro Power Automate (isso já causou bucket duplicado no Planner). Pode acontecer por toque duplo
+// no botão num celular lento, ou porque o app volta a ficar "online" bem na hora em que um envio já
+// estava em andamento (retryPendingSyncs entra em ação de novo antes do primeiro terminar).
+const syncInFlight = new Set();
 function attemptSync(record, eventType, force){
   if(!settings.webhookUrl) return null;
   if(!force){
     if(!settings.autoSync) return null;
     if(!navigator.onLine) return null;
   }
+  if(record.synced) return null;
+  if(syncInFlight.has(record.id)) return null;
+  syncInFlight.add(record.id);
   return fetch(settings.webhookUrl, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -1700,7 +1708,8 @@ function attemptSync(record, eventType, force){
       render();
     }
     return resp.ok;
-  }).catch(()=>false);
+  }).catch(()=>false)
+  .finally(()=>{ syncInFlight.delete(record.id); });
 }
 // Best-effort: avisa o fluxo "Cadastro e Alerta de Manutencao" sempre que uma operação é finalizada,
 // pra atualizar o horímetro atual do trator no SharePoint (não importa o aparelho/operador) e disparar
