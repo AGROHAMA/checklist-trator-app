@@ -452,6 +452,12 @@
     </div>
 
     <div class="settings-block">
+      <h3>Diagnóstico</h3>
+      <div class="hint" style="margin-bottom:10px;">Se alguma operação sumir do aparelho, toque aqui e envie o texto copiado para o suporte — ajuda a descobrir o que aconteceu.</div>
+      <button class="btn btn-secondary btn-block" onclick="copyDiagnostico()">Copiar diagnóstico técnico</button>
+    </div>
+
+    <div class="settings-block">
       <h3>Zona de risco</h3>
       <button class="btn btn-danger btn-block" onclick="clearAll()">Apagar todos os registros deste aparelho</button>
     </div>
@@ -695,32 +701,80 @@
 /* ===================== Armazenamento local (offline-first) ===================== */
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
+// Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
+// certo. Serve só pra recuperar uma operação que sumiu do armazenamento principal por algum motivo
+// (nunca é a fonte "oficial" dos dados). Ver uso em saveRecords() e na checagem de recuperação no Init.
+const BACKUP_KEY = 'agrohama_operacoes_backup_v1';
+// Registro simples de eventos importantes (criar/apagar/recuperar operação, armazenamento cheio
+// etc.), guardado só neste aparelho, pra ajudar a investigar relatos de "a operação sumiu" — sem
+// isso não tem como saber depois o que realmente aconteceu. Guarda só os últimos 300 eventos.
+const DEBUG_LOG_KEY = 'agrohama_debug_log_v1';
+function debugLog(event, extra){
+  try{
+    const log = JSON.parse(localStorage.getItem(DEBUG_LOG_KEY)) || [];
+    log.push(Object.assign({t: Date.now(), event}, extra || {}));
+    while(log.length > 300) log.shift();
+    localStorage.setItem(DEBUG_LOG_KEY, JSON.stringify(log));
+  }catch(e){ /* o log nunca pode travar o app */ }
+}
+function saveBackup(list){
+  try{
+    const lean = list.map(r => r ? Object.assign({}, r, {fotos: undefined}) : r);
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(lean));
+  }catch(e){ /* backup é best-effort */ }
+}
+function loadBackup(){
+  try{ return JSON.parse(localStorage.getItem(BACKUP_KEY)) || []; }
+  catch(e){ return []; }
+}
 
 function loadRecords(){
   try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
   catch(e){ return []; }
 }
 function saveRecords(records){
+  // Proteção contra "instância atrasada": se o app foi aberto mais de uma vez ao mesmo tempo no
+  // mesmo aparelho (ex.: tocou no ícone de novo sem o anterior ter fechado direito), cada cópia
+  // aberta só conhece os registros que existiam no momento em que ELA foi aberta. Sem isso, ao
+  // salvar, uma cópia "atrasada" sobrescreve o armazenamento com a lista dela (mais antiga) e
+  // apaga sem querer uma operação nova criada pela outra cópia — foi isso que aparentemente
+  // aconteceu no relato do app fechar/abrir e a operação sumir. Por isso, antes de gravar,
+  // qualquer registro que já esteja salvo no aparelho mas que esta cópia do app nunca viu é
+  // sempre preservado (nunca é tratado como "para apagar").
+  records.forEach(r => { if(r && r.id) knownRecordIds.add(r.id); });
+  let toSave = records;
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    const current = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const foreign = current.filter(r => r && r.id && !knownRecordIds.has(r.id));
+    if(foreign.length){
+      toSave = records.concat(foreign);
+      foreign.forEach(r => { records.push(r); knownRecordIds.add(r.id); });
+      debugLog('merge_registro_estrangeiro', {ids: foreign.map(r=>r.id)});
+    }
+  }catch(e){ /* se der erro lendo o que já está salvo, segue só com o que esta cópia já tem */ }
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    saveBackup(toSave);
     return true;
   }catch(e){
     // Armazenamento cheio (comum em aparelhos com muitas fotos acumuladas).
     // Tenta liberar espaço removendo fotos de registros antigos já concluídos e sincronizados.
     try{
-      const sorted = records.slice().sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));
+      const sorted = toSave.slice().sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));
       for(const r of sorted){
         if(r.synced && r.status === 'concluido' && r.fotos && (r.fotos.agua || r.fotos.oleoMotor || r.fotos.filtroAr || r.fotos.oleoHidraulico)){
           r.fotos = {agua:null, oleoMotor:null, filtroAr:null, oleoHidraulico:null};
           try{
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-            toast('Armazenamento do aparelho estava cheio: fotos antigas já sincronizadas foram apagadas do aparelho para liberar espaço.');
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+            saveBackup(toSave);
+            toast('Armazenamento do aparelho estava cheio: fotos antigas já sincronizadas foram apagadas do aparelho para liberar espaço.', 9000);
             return true;
           }catch(e2){ /* continua liberando mais registros */ }
         }
       }
     }catch(e3){ /* ignora e cai no aviso abaixo */ }
-    toast('ATENÇÃO: armazenamento do aparelho está cheio e este registro pode não ter sido salvo localmente.');
+    debugLog('armazenamento_cheio_falhou', {qtd: toSave.length});
+    toast('ATENÇÃO: armazenamento do aparelho está cheio e este registro pode não ter sido salvo localmente.', 9000);
     return false;
   }
 }
@@ -733,6 +787,33 @@ function saveSettingsObj(s){
 }
 
 let records = loadRecords();
+// ids de registros que esta cópia do app já conhece (carregados ao abrir ou criados durante o
+// uso) — usado por saveRecords() para nunca apagar um registro novo que outra cópia/aba do app
+// tenha criado nesse meio tempo. Ver comentário em saveRecords().
+let knownRecordIds = new Set(records.map(r => r && r.id));
+
+// Recuperação automática a partir do backup: se alguma operação existe no backup deste MESMO
+// aparelho mas não está mais no armazenamento principal, ela é restaurada aqui. Como o backup é
+// só deste aparelho (não vem de outro dispositivo), é seguro trazer de volta sem risco de misturar
+// dados de outra pessoa — o objetivo é não deixar um horímetro inicial já digitado se perder.
+(function recuperarDoBackup(){
+  try{
+    const backup = loadBackup();
+    const idsAtuais = new Set(records.map(r => r && r.id));
+    const perdidos = backup.filter(r => r && r.id && !idsAtuais.has(r.id));
+    if(perdidos.length){
+      perdidos.forEach(r => { records.push(r); knownRecordIds.add(r.id); });
+      debugLog('recuperado_do_backup', {ids: perdidos.map(r=>r.id)});
+      saveRecords(records);
+      const emAndamento = perdidos.filter(r=>r.status==='andamento').length;
+      const aviso = emAndamento
+        ? `Recuperamos ${perdidos.length} operação(ões) que tinha(m) sumido do aparelho, incluindo ${emAndamento} em andamento. Confira os dados antes de continuar.`
+        : `Recuperamos ${perdidos.length} operação(ões) que tinha(m) sumido do aparelho. Confira os dados.`;
+      setTimeout(() => toast(aviso, 9000), 800);
+    }
+  }catch(e){ /* recuperação é best-effort, nunca pode travar a abertura do app */ }
+})();
+
 let settings = loadSettings();
 if(!settings.adminPin) settings.adminPin = '';
 let currentFilter = 'hoje';
@@ -1108,6 +1189,9 @@ function attemptSyncMaintenance(cfg, info, force){
       cfg.alertSent[vencido ? 'vencido' : 'proximo'] = true;
       if(vencido) cfg.alertSent.proximo = true;
       saveMaint(maintConfigs);
+      // Sem isso, o contador de "pendências" no topo da tela fica desatualizado até a próxima
+      // ação do usuário — mesmo depois do envio ter sido confirmado com sucesso em segundo plano.
+      updatePendingSyncButton();
     }
     return resp.ok;
   }).catch(()=>false);
@@ -1182,11 +1266,12 @@ function mondayOf(date){
   d.setDate(d.getDate() + diff);
   return d;
 }
-function toast(msg){
+function toast(msg, durationMs){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(()=>t.classList.remove('show'), durationMs || 2200);
 }
 function hoursWorked(hi, hf){
   if(!hi || !hf) return '[A CONFIRMAR]';
@@ -1314,6 +1399,7 @@ function saveStart(){
     launched: false
   };
   records.push(rec);
+  debugLog('inicio_criado', {id: rec.id, trator: rec.tractor, operador: rec.operator, fazenda: rec.farm});
   const saved = saveRecords(records);
   closeModal('modalStart');
   render();
@@ -1402,7 +1488,7 @@ function capturePhoto(key, inputEl){
 
 function openFinishForm(id){
   const r = records.find(x=>x.id===id);
-  if(!r) return;
+  if(!r){ toast('Essa operação não foi encontrada neste aparelho. Atualize a tela (puxe para atualizar) e tente de novo; se sumir de novo, avise o suporte.', 9000); return; }
   document.getElementById('fin_id').value = id;
   document.getElementById('fin_horaFinal').value = nowHM();
   document.getElementById('fin_horimetroFinal').value = '';
@@ -1412,7 +1498,7 @@ function openFinishForm(id){
 function saveFinish(){
   const id = document.getElementById('fin_id').value;
   const r = records.find(x=>x.id===id);
-  if(!r) return;
+  if(!r){ toast('Essa operação não foi encontrada neste aparelho. Nada foi salvo. Avise o suporte.', 9000); closeModal('modalFinish'); return; }
 
   r.horaFinal = document.getElementById('fin_horaFinal').value;
   r.horimetroFinal = document.getElementById('fin_horimetroFinal').value;
@@ -1494,7 +1580,7 @@ function captureProblemPhoto(inputEl){
 
 function openProblemForm(id){
   const r = records.find(x=>x.id===id);
-  if(!r) return;
+  if(!r){ toast('Essa operação não foi encontrada neste aparelho. Atualize a tela e tente de novo.', 9000); return; }
   document.getElementById('prob_id').value = id;
   document.getElementById('prob_texto').value = '';
   pendingProblemPhoto = null;
@@ -1511,7 +1597,7 @@ function openProblemForm(id){
 function saveProblem(){
   const id = document.getElementById('prob_id').value;
   const r = records.find(x=>x.id===id);
-  if(!r) return;
+  if(!r){ toast('Essa operação não foi encontrada neste aparelho. Nada foi salvo. Avise o suporte.', 9000); closeModal('modalProblema'); return; }
   const texto = document.getElementById('prob_texto').value.trim();
   if(!texto){
     toast('Descreva o que aconteceu.');
@@ -1536,7 +1622,8 @@ function saveProblem(){
 
 function resolveProblem(id){
   const r = records.find(x=>x.id===id);
-  if(!r || !r.problema) return;
+  if(!r){ toast('Essa operação não foi encontrada neste aparelho.', 9000); return; }
+  if(!r.problema) return;
   r.problema.resolvido = true;
   r.problema.resolvedAt = Date.now();
   r.updatedAt = Date.now();
@@ -1550,6 +1637,7 @@ function resolveProblem(id){
 
 function deleteRecord(id){
   if(!confirm('Excluir este registro deste aparelho?')) return;
+  debugLog('registro_excluido', {id});
   records = records.filter(r=>r.id!==id);
   saveRecords(records);
   render();
@@ -1674,6 +1762,26 @@ function copyTeamsText(){
     fallbackCopy(text);
   }
 }
+// Junta o histórico de eventos deste aparelho (criação/exclusão de registros, recuperações de
+// backup, armazenamento cheio) num texto simples, pra mandar pro suporte quando alguém relatar que
+// uma operação sumiu — sem isso, fica só a palavra de quem usou contra o código.
+function copyDiagnostico(){
+  let log = [];
+  try{ log = JSON.parse(localStorage.getItem(DEBUG_LOG_KEY)) || []; }catch(e){}
+  const linhas = log.slice(-80).map(ev => {
+    const d = new Date(ev.t);
+    const hora = d.toLocaleString('pt-BR');
+    const detalhes = Object.keys(ev).filter(k=>k!=='t'&&k!=='event').map(k=>`${k}=${JSON.stringify(ev[k])}`).join(' ');
+    return `${hora} — ${ev.event}${detalhes ? ' — '+detalhes : ''}`;
+  });
+  const texto = `Diagnóstico Checklist de Trator Digital\nRegistros no aparelho agora: ${records.length}\n\n`
+    + (linhas.length ? linhas.join('\n') : '(nenhum evento registrado ainda neste aparelho)');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(texto).then(()=>toast('Diagnóstico copiado! Cole e envie para o suporte.', 4000)).catch(()=>fallbackCopy(texto));
+  } else {
+    fallbackCopy(texto);
+  }
+}
 function fallbackCopy(text){
   const ta = document.createElement('textarea');
   ta.value = text;
@@ -1742,6 +1850,10 @@ function syncHorimetroAtualizado(record, force){
     if(resp.ok){
       record.horimetroSynced = true;
       saveRecords(records);
+      // Sem isso, o contador de "pendências" no topo da tela fica desatualizado até a próxima
+      // ação do usuário — mesmo depois do envio ter sido confirmado com sucesso em segundo plano.
+      // É provável que boa parte do que aparece como "pendente" já tenha sido enviado de verdade.
+      updatePendingSyncButton();
     }
     return resp.ok;
   }).catch(()=>false);
@@ -2187,6 +2299,7 @@ function importData(evt){
 }
 function clearAll(){
   if(!confirm('Isso vai apagar TODOS os registros salvos neste aparelho. Tem certeza?')) return;
+  debugLog('limpar_tudo', {qtdAntes: records.length});
   records = [];
   saveRecords(records);
   render();
@@ -2262,15 +2375,29 @@ function ackHorimetroLembrete(){
 }
 
 /* ===================== Init ===================== */
+// Pede ao navegador para NÃO apagar automaticamente os dados deste app quando o aparelho ficar
+// com pouco espaço (isso pode acontecer sozinho em tablets cheios de fotos/apps). Não garante
+// 100%, mas reduz bastante o risco de perda de registros por limpeza automática do sistema.
+if(navigator.storage && navigator.storage.persist){
+  navigator.storage.persist().catch(()=>{});
+}
 updateConnStatus();
 buildEquipDatalist();
 render();
 checkMaintenanceAlerts();
 updatePendingSyncButton();
+// Tenta enviar sozinho o que ficou pendente de uma sessão anterior assim que o app abre (e não só
+// quando o aparelho "percebe" que voltou a ficar online): sem isso, se o app foi fechado ainda
+// offline e reaberto já com internet, o pendente só saía do lugar quando alguém tocasse manualmente
+// em "Enviar pendências agora" — o que fazia o aviso de pendência parecer acumular sozinho.
+retryPendingSyncs();
 checkHorimetroLembrete();
 setInterval(checkHorimetroLembrete, 30000);
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') checkHorimetroLembrete();
+  if(document.visibilityState === 'visible'){
+    checkHorimetroLembrete();
+    retryPendingSyncs();
+  }
 });
 
 /* ===================== PWA: service worker (offline + atualização automática) =====================
