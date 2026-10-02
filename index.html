@@ -1990,7 +1990,7 @@ function manualSendPending(){
     else toast(`${ok} de ${total} enviado(s). O restante continua sem internet — tente de novo depois.`);
   });
 }
-window.addEventListener('online', ()=>{ updateConnStatus(); retryPendingSyncs(); checkMaintenanceAlerts(); });
+window.addEventListener('online', ()=>{ updateConnStatus(); retryPendingSyncs(); loadFromBackend(); checkMaintenanceAlerts(); });
 window.addEventListener('offline', updateConnStatus);
 function updateConnStatus(){
   const el = document.getElementById('connStatus');
@@ -2133,7 +2133,7 @@ function saveSettings(){
   settings.autoSync = document.getElementById('autoSyncToggle').checked;
   saveSettingsObj(settings);
   toast('Ajustes salvos.');
-  retryPendingSyncs();
+  retryPendingSyncs(); loadFromBackend();
   updatePendingSyncButton();
 }
 
@@ -2270,17 +2270,6 @@ function renderSecurityBlock(){
   const removeBtn = document.getElementById('btnRemovePin');
   if(removeBtn) removeBtn.style.display = has ? 'inline-block' : 'none';
 }
-
-/* ===================== Numeração automática do talão (referência+dia/mês/ano2/hora/minuto, sem pontuação — ver buildAutoFormNumber) ===================== */
-// Chamado quando o campo "Trator" muda no formulário de Iniciar Operação: reconhece a máquina e
-// gera o número do talão na hora (o talão pertence ao trator/veículo, não ao operador). Campo é
-// só-leitura — não existe mais edição manual do número.
-function onTractorFieldChange(value){
-  const field = document.getElementById('f_formNumber');
-  const ref = resolveMachineRefForTractor(value);
-  field.value = ref ? buildAutoFormNumber(ref) : '';
-}
-
 /* ===================== Backup / restauração ===================== */
 function exportData(){
   // Exporta registros + cadastro de equipamentos da Manutenção (referência da máquina, intervalo
@@ -2428,7 +2417,27 @@ function ackHorimetroLembrete(){
   horimetroLembreteAtivo = null;
   closeModal('modalHorimetroLembrete');
 }
-
+/* ===================== Carregar dados do Backend ===================== */
+function loadFromBackend(){
+  if(!settings.backendUrl) return;
+  const backendUrl = settings.backendUrl.replace(/\/$/, '');
+  fetch(`${backendUrl}/api/operacoes`)
+    .then(resp => resp.json())
+    .then(data => {
+      if(Array.isArray(data)){
+        const localIds = new Set(records.map(r => r.id));
+        data.forEach(serverRec => {
+          if(!localIds.has(serverRec.id)){
+            records.push(serverRec);
+            knownRecordIds.add(serverRec.id);
+          }
+        });
+        if(data.length > 0) saveRecords(records);
+        render();
+      }
+    })
+    .catch(()=>{});
+}
 /* ===================== Init ===================== */
 // Pede ao navegador para NÃO apagar automaticamente os dados deste app quando o aparelho ficar
 // com pouco espaço (isso pode acontecer sozinho em tablets cheios de fotos/apps). Não garante
@@ -2445,13 +2454,13 @@ updatePendingSyncButton();
 // quando o aparelho "percebe" que voltou a ficar online): sem isso, se o app foi fechado ainda
 // offline e reaberto já com internet, o pendente só saía do lugar quando alguém tocasse manualmente
 // em "Enviar pendências agora" — o que fazia o aviso de pendência parecer acumular sozinho.
-retryPendingSyncs();
+retryPendingSyncs(); loadFromBackend();
 checkHorimetroLembrete();
 setInterval(checkHorimetroLembrete, 30000);
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible'){
     checkHorimetroLembrete();
-    retryPendingSyncs();
+    retryPendingSyncs(); loadFromBackend();
   }
 });
 
