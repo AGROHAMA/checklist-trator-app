@@ -410,7 +410,13 @@
 
   <div id="viewSettings" style="display:none;">
     <div class="settings-block">
-      <h3>Integração com Teams</h3>
+      <h3>Integração com Backend / Banco de Dados</h3>
+      <div class="field">
+        <label>URL do Backend (novo sistema)</label>
+        <input type="url" id="backendUrl" placeholder="http://192.168.1.70:3000">
+        <div class="hint">URL do servidor Backend. Ex: http://192.168.1.70:3000 ou https://seu-dominio.com. Se preenchido, o app sincroniza com o banco de dados central em vez do Power Automate.</div>
+      </div>
+      <h3 style="margin-top:18px;">Integração com Teams (Legacy)</h3>
       <div class="field">
         <label>URL de automação (webhook / Power Automate)</label>
         <input type="url" id="webhookUrl" placeholder="https://...">
@@ -779,8 +785,8 @@ function saveRecords(records){
   }
 }
 function loadSettings(){
-  try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {webhookUrl:'', webhookUrlManut:'', autoSync:false}; }
-  catch(e){ return {webhookUrl:'', webhookUrlManut:'', autoSync:false}; }
+  try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {webhookUrl:'', webhookUrlManut:'', autoSync:false, backendUrl:''}; }
+  catch(e){ return {webhookUrl:'', webhookUrlManut:'', autoSync:false, backendUrl:''}; }
 }
 function saveSettingsObj(s){
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
@@ -1347,6 +1353,39 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+/* ===================== Consulta de Operações Abertas (Backend) ===================== */
+function consultarOperacoesAbertas(tratorNome){
+  if(!settings.backendUrl || !tratorNome.trim()) return;
+  const backendUrl = settings.backendUrl.replace(/\/$/, '');
+  fetch(`${backendUrl}/api/operacoes-abertas?trator=${encodeURIComponent(tratorNome.trim())}`, {
+    timeout: 4000
+  }).then(resp=>{
+    if(!resp.ok) return null;
+    return resp.json();
+  }).then(data=>{
+    if(!data) return;
+    const msg = `⚠️ Já existe uma operação em aberto nesse trator!\n`
+      + `Operador: ${data.operador || 'N/A'}\n`
+      + `Horário: ${data.horaInicio || 'N/A'}\n`
+      + `Horímetro inicial: ${data.horimetro || 'N/A'}\n\n`
+      + `Confirme com essa pessoa antes de iniciar uma nova operação.`;
+    toast(msg, 5000);
+  }).catch(()=>{});
+}
+
+function onTractorFieldChange(tratorVal){
+  const ref = resolveMachineRefForTractor(tratorVal);
+  if(ref){
+    document.getElementById('f_formNumber').value = buildAutoFormNumber(ref);
+  } else {
+    document.getElementById('f_formNumber').value = '';
+  }
+  // Consulta o Backend pra verificar operações em aberto (best-effort, sem bloquear)
+  if(document.getElementById('modalStart').classList.contains('open')){
+    consultarOperacoesAbertas(tratorVal);
+  }
+}
+
 /* ===================== Formulário: Iniciar ===================== */
 function openStartForm(){
   document.getElementById('formStart').reset();
@@ -1793,16 +1832,20 @@ function fallbackCopy(text){
   document.body.removeChild(ta);
 }
 
-/* ===================== Sincronização best-effort com Teams (webhook / Power Automate) ===================== */
+/* ===================== Sincronização best-effort com Backend / Teams ===================== */
 // force=true ignora o toggle "Tentar envio automático" e o navigator.onLine (usado pelo botão manual
 // "Enviar pendências agora" — útil quando a detecção de conexão do aparelho não é confiável no campo).
 // Trava contra envio duplicado: evita que o MESMO registro seja mandado duas vezes ao mesmo tempo
-// pro Power Automate (isso já causou bucket duplicado no Planner). Pode acontecer por toque duplo
+// pro servidor (isso já causou bucket duplicado no Planner). Pode acontecer por toque duplo
 // no botão num celular lento, ou porque o app volta a ficar "online" bem na hora em que um envio já
 // estava em andamento (retryPendingSyncs entra em ação de novo antes do primeiro terminar).
 const syncInFlight = new Set();
 function attemptSync(record, eventType, force){
-  if(!settings.webhookUrl) return null;
+  // Prioriza Backend novo se configurado; senão usa Power Automate legacy
+  const backendUrl = settings.backendUrl ? settings.backendUrl.replace(/\/$/, '') : null;
+  const legacyUrl = settings.webhookUrl;
+
+  if(!backendUrl && !legacyUrl) return null;
   if(!force){
     if(!settings.autoSync) return null;
     if(!navigator.onLine) return null;
@@ -1810,14 +1853,24 @@ function attemptSync(record, eventType, force){
   if(record.synced) return null;
   if(syncInFlight.has(record.id)) return null;
   syncInFlight.add(record.id);
-  return fetch(settings.webhookUrl, {
+
+  const endpoint = backendUrl ? `${backendUrl}/api/operacoes` : legacyUrl;
+  const payload = backendUrl
+    ? {
+        evento: eventType,
+        record: record
+      }
+    : {
+        evento: eventType,
+        texto: buildTeamsText(record),
+        registro: record
+      };
+
+  return fetch(endpoint, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      evento: eventType,
-      texto: buildTeamsText(record),
-      registro: record
-    })
+    body: JSON.stringify(payload),
+    timeout: 8000
   }).then(resp=>{
     if(resp.ok){
       record.synced = true;
@@ -2059,6 +2112,7 @@ function switchTab(tab){
   document.getElementById('tabSettings').classList.toggle('active', tab==='settings');
   document.getElementById('mainEl').classList.toggle('wide', tab==='week');
   if(tab==='settings'){
+    document.getElementById('backendUrl').value = settings.backendUrl || '';
     document.getElementById('webhookUrl').value = settings.webhookUrl || '';
     document.getElementById('webhookUrlManut').value = settings.webhookUrlManut || '';
     document.getElementById('autoSyncToggle').checked = !!settings.autoSync;
@@ -2073,6 +2127,7 @@ function switchTab(tab){
   }
 }
 function saveSettings(){
+  settings.backendUrl = document.getElementById('backendUrl').value.trim();
   settings.webhookUrl = document.getElementById('webhookUrl').value.trim();
   settings.webhookUrlManut = document.getElementById('webhookUrlManut').value.trim();
   settings.autoSync = document.getElementById('autoSyncToggle').checked;
