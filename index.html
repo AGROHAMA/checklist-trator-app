@@ -2452,14 +2452,32 @@ function loadFromBackend(){
       .then(resp => resp.json())
       .then(data => {
         if(Array.isArray(data)){
-          const localIds = new Set(records.map(r => r.id));
+          const serverIds = new Set(data.map(r => r.id));
+
+          // Atualiza ou adiciona registros do servidor
           data.forEach(serverRec => {
-            if(!localIds.has(serverRec.id)){
+            const local = records.find(r => r.id === serverRec.id);
+            if(!local){
               records.push(serverRec);
               knownRecordIds.add(serverRec.id);
+            } else {
+              // Atualiza se servidor tem versão mais recente
+              const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
+              const serverTime = new Date(serverRec.updatedAt || serverRec.createdAt || 0).getTime();
+              if(serverTime >= localTime){
+                Object.assign(local, serverRec);
+              }
             }
           });
-          if(data.length > 0) saveRecords(records);
+
+          // Remove registros que foram deletados no servidor
+          for(let i = records.length - 1; i >= 0; i--){
+            if(!serverIds.has(records[i].id)){
+              records.splice(i, 1);
+            }
+          }
+
+          if(data.length > 0 || records.length > 0) saveRecords(records);
           render();
         }
       })
