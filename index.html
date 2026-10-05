@@ -412,7 +412,7 @@
     <div class="settings-block">
       <h3>Versão do App</h3>
       <div style="padding:10px; background:#f0f0f0; border-radius:6px; font-family:monospace; font-size:13px;">
-        <div><strong>App Version:</strong> v14 (2026-10-05)</div>
+        <div><strong>App Version:</strong> v15 (2026-10-05)</div>
         <div id="versionStatus" style="margin-top:8px;"><strong>Service Worker:</strong> Carregando...</div>
       </div>
     </div>
@@ -1688,6 +1688,10 @@ function deleteRecord(id){
   records = records.filter(r=>r.id!==id);
   saveRecords(records);
   render();
+  if(settings.backendUrl){
+    const backendUrl = settings.backendUrl.replace(/\/$/, '');
+    fetch(`${backendUrl}/api/operacoes/${id}`, { method: 'DELETE' }).catch(()=>{});
+  }
 }
 
 /* ===================== Texto para Teams (mesmo padrão da skill relatorio-operacao-agricola) ===================== */
