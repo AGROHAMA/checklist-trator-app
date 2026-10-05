@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Operações</title>
+  <style>
+    :root {
+      --bg: #f9fafb;
+      --fg: #111827;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --accent: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --muted: #6b7280;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #111827;
+        --fg: #f9fafb;
+        --card: #1f2937;
+        --border: #374151;
+        --accent: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --muted: #9ca3af;
+        color-scheme: dark;
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #111827;
+      --fg: #f9fafb;
+      --card: #1f2937;
+      --border: #374151;
+      --accent: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --muted: #9ca3af;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .kanban {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      min-height: 600px;
+    }
+
+    .column {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .column-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .column-title {
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .column-badge {
+      background: var(--accent);
+      color: white;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .badge-tractor {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--accent);
+    }
+
+    .badge-operator {
+      background: rgba(59, 130, 246, 0.1);
+      color: #3b82f6;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--muted);
+    }
+
+    .empty-state-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+    }
+
+    .notification {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      background: var(--accent);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      animation: slideIn 0.3s ease;
+      z-index: 1000;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .refresh-btn {
+      padding: 8px 16px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+
+    .refresh-btn:hover {
+      opacity: 0.9;
+    }
+
+    .refresh-btn:active {
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Dashboard de Operações</h1>
+    <button class="refresh-btn" onclick="loadOperacoes()">🔄 Atualizar</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="totalOps">0</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="emAndam">0</div>
+      <div class="stat-label">Em Andamento</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="concluidas">0</div>
+      <div class="stat-label">Concluídas</div>
+    </div>
+  </div>
+
+  <div class="kanban" id="kanban">
+    <div class="loading">⏳ Carregando operações...</div>
+  </div>
+
+  <script>
+    let BACKEND_URL = localStorage.getItem('backendUrl') || 'http://192.168.1.70:3000';
+    let operacoes = [];
+    let ultimaCarregamento = {};
+
+    window.addEventListener('storage', () => {
+      const novaUrl = localStorage.getItem('backendUrl');
+      if(novaUrl && novaUrl !== BACKEND_URL) {
+        BACKEND_URL = novaUrl;
+        loadOperacoes();
+      }
+    });
+
+    async function loadOperacoes() {
+      try {
+        console.log('Conectando a:', BACKEND_URL + '/api/operacoes');
+        const response = await fetch(`${BACKEND_URL}/api/operacoes`, {
+          method: 'GET',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erro HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        operacoes = data || [];
+        console.log('Operações carregadas:', operacoes.length);
+
+        atualizarDashboard();
+        notificarNovas();
+      } catch (err) {
+        console.error('Erro ao conectar:', err.message);
+        document.getElementById('kanban').innerHTML =
+          `<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Erro ao conectar: ${err.message}<br><small style="color: #999;">URL: ${BACKEND_URL}</small></p></div>`;
+      }
+    }
+
+    function atualizarDashboard() {
+      const emAndamento = operacoes.filter(o => o.status === 'andamento');
+      const concluidas = operacoes.filter(o => o.status === 'concluido');
+
+      document.getElementById('totalOps').textContent = operacoes.length;
+      document.getElementById('emAndam').textContent = emAndamento.length;
+      document.getElementById('concluidas').textContent = concluidas.length;
+
+      const kanban = document.getElementById('kanban');
+      kanban.innerHTML = '';
+
+      const colunas = [
+        { status: 'andamento', titulo: 'Em Andamento', icon: '⏳', dados: emAndamento },
+        { status: 'concluido', titulo: 'Concluídas', icon: '✅', dados: concluidas }
+      ];
+
+      colunas.forEach(coluna => {
+        const colDiv = document.createElement('div');
+        colDiv.className = 'column';
+
+        const header = document.createElement('div');
+        header.className = 'column-header';
+        header.innerHTML = `
+          <span class="column-title">${coluna.icon} ${coluna.titulo}</span>
+          <span class="column-badge">${coluna.dados.length}</span>
+        `;
+        colDiv.appendChild(header);
+
+        const cards = document.createElement('div');
+        cards.className = 'cards';
+
+        if (coluna.dados.length === 0) {
+          cards.innerHTML = '<div class="empty-state"><p>Nenhuma operação</p></div>';
+        } else {
+          coluna.dados.forEach(op => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+              <div class="card-title">${op.operation || 'Operação'} • ${op.culture || 'N/A'}</div>
+              <div class="card-meta">
+                <span class="badge badge-tractor">🚜 ${op.tractor || 'N/A'}</span>
+                <span class="badge badge-operator">👤 ${op.operator || 'N/A'}</span>
+              </div>
+              <div style="font-size: 12px; color: var(--muted); margin-top: 8px;">
+                🕐 ${op.horaInicio || 'N/A'} | 📍 ${op.farm || 'N/A'}
+              </div>
+            `;
+            cards.appendChild(card);
+          });
+        }
+
+        colDiv.appendChild(cards);
+        kanban.appendChild(colDiv);
+      });
+    }
+
+    function notificarNovas() {
+      operacoes.forEach(op => {
+        if (!ultimaCarregamento[op.id]) {
+          mostrarNotificacao(`🚜 Nova operação: ${op.operation || 'Operação'} - ${op.tractor || 'N/A'}`);
+          ultimaCarregamento[op.id] = true;
+        }
+      });
+    }
+
+    function mostrarNotificacao(msg) {
+      const notif = document.createElement('div');
+      notif.className = 'notification';
+      notif.textContent = msg;
+      document.body.appendChild(notif);
+
+      setTimeout(() => notif.remove(), 4000);
+    }
+
+    // Carregar na inicialização
+    loadOperacoes();
+
+    // Atualizar a cada 5 segundos
+    setInterval(loadOperacoes, 5000);
+
+    // Monitorar mudanças na URL do backend (se mudar nos Ajustes)
+    const checkUrlChange = setInterval(() => {
+      const novaUrl = localStorage.getItem('backendUrl') || 'http://192.168.1.70:3000';
+      if(novaUrl !== BACKEND_URL) {
+        console.log('URL do backend mudou:', BACKEND_URL, '→', novaUrl);
+        BACKEND_URL = novaUrl;
+        loadOperacoes();
+      }
+    }, 2000);
+  </script>
+</body>
+</html>

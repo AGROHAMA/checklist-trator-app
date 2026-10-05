@@ -2485,6 +2485,7 @@ updatePendingSyncButton();
 retryPendingSyncs(); loadFromBackend();
 checkHorimetroLembrete();
 setInterval(checkHorimetroLembrete, 30000);
+setInterval(() => { if(settings.backendUrl) loadFromBackend(); }, 15000);
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible'){
     checkHorimetroLembrete();
