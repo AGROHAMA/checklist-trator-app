@@ -410,6 +410,14 @@
 
   <div id="viewSettings" style="display:none;">
     <div class="settings-block">
+      <h3>Versão do App</h3>
+      <div style="padding:10px; background:#f0f0f0; border-radius:6px; font-family:monospace; font-size:13px;">
+        <div><strong>App Version:</strong> v13 (2026-10-05)</div>
+        <div id="versionStatus" style="margin-top:8px;"><strong>Service Worker:</strong> Carregando...</div>
+      </div>
+    </div>
+
+    <div class="settings-block">
       <h3>Integração com Backend / Banco de Dados</h3>
       <div class="field">
         <label>URL do Backend (novo sistema)</label>
@@ -2117,6 +2125,7 @@ function switchTab(tab){
     document.getElementById('webhookUrlManut').value = settings.webhookUrlManut || '';
     document.getElementById('autoSyncToggle').checked = !!settings.autoSync;
     renderSecurityBlock();
+    updateVersionStatus();
   }
   if(tab==='week'){
     renderWeek();
@@ -2135,6 +2144,17 @@ function saveSettings(){
   toast('Ajustes salvos.');
   retryPendingSyncs(); loadFromBackend();
   updatePendingSyncButton();
+}
+
+function updateVersionStatus(){
+  if('caches' in window){
+    caches.keys().then(names => {
+      const swVersion = names.find(n => n.startsWith('agrohama-checklist-')) || 'não detectada';
+      document.getElementById('versionStatus').innerHTML = `<strong>Service Worker:</strong> ${swVersion}`;
+    }).catch(() => {
+      document.getElementById('versionStatus').innerHTML = `<strong>Service Worker:</strong> erro ao ler`;
+    });
+  }
 }
 
 /* ===================== Senha (PIN) de acesso às abas Manutenção/Ajustes ===================== */
