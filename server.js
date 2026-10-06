@@ -116,7 +116,25 @@ const server = http.createServer(async (req, res) => {
         const orNull = (val) => val === '' || val === null ? null : val;
 
         await client.query(
-          'INSERT INTO operacoes (id, tractor, operator, farm, plot, culture, operation, implement, formnumber, horainicio, horafinal, horimetroinicial, horimetrofinal, obs, status, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)',
+          `INSERT INTO operacoes (id, tractor, operator, farm, plot, culture, operation, implement, formnumber, horainicio, horafinal, horimetroinicial, horimetrofinal, obs, status, date, updatedat)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+           ON CONFLICT (id) DO UPDATE SET
+             tractor = $2,
+             operator = $3,
+             farm = $4,
+             plot = $5,
+             culture = $6,
+             operation = $7,
+             implement = $8,
+             formnumber = $9,
+             horainicio = $10,
+             horafinal = $11,
+             horimetroinicial = $12,
+             horimetrofinal = $13,
+             obs = $14,
+             status = $15,
+             date = $16,
+             updatedat = NOW()`,
           [
             data.record.id,
             orNull(data.record.tractor),
