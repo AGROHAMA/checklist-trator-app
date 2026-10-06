@@ -37,8 +37,29 @@ const server = http.createServer(async (req, res) => {
         'SELECT * FROM operacoes WHERE tractor = $1 AND status = $2 LIMIT 1',
         [trator, 'andamento']
       );
+      const row = result.rows[0];
+      const normalized = row ? {
+        id: row.id,
+        tractor: row.tractor,
+        operator: row.operator,
+        farm: row.farm,
+        plot: row.plot,
+        culture: row.culture,
+        operation: row.operation,
+        implement: row.implement,
+        formNumber: row.formnumber,
+        horaInicio: row.horainicio,
+        horaFinal: row.horafinal,
+        horimetroInicial: row.horimetroinicial,
+        horimetroFinal: row.horimetrofinal,
+        obs: row.obs,
+        status: row.status,
+        createdAt: row.createdat,
+        updatedAt: row.updatedat,
+        date: row.date
+      } : {};
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result.rows[0] || {}));
+      res.end(JSON.stringify(normalized));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ erro: err.message }));
@@ -92,24 +113,25 @@ const server = http.createServer(async (req, res) => {
         console.log('POST /api/operacoes - Dados recebidos:', data);
 
         const status = data.evento === 'inicio' ? 'andamento' : data.evento;
+        const orNull = (val) => val === '' || val === null ? null : val;
 
         await client.query(
-          'INSERT INTO operacoes (id, tractor, operator, farm, plot, culture, operation, implement, formNumber, horaInicio, horaFinal, horimetroInicial, horimetroFinal, obs, status, data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)',
+          'INSERT INTO operacoes (id, tractor, operator, farm, plot, culture, operation, implement, formnumber, horainicio, horafinal, horimetroinicial, horimetrofinal, obs, status, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)',
           [
             data.record.id,
-            data.record.tractor,
-            data.record.operator,
-            data.record.farm,
-            data.record.plot,
-            data.record.culture,
-            data.record.operation,
-            data.record.implement,
-            data.record.formNumber,
-            data.record.horaInicio,
-            data.record.horaFinal,
-            data.record.horimetroInicial,
-            data.record.horimetroFinal,
-            data.record.obs,
+            orNull(data.record.tractor),
+            orNull(data.record.operator),
+            orNull(data.record.farm),
+            orNull(data.record.plot),
+            orNull(data.record.culture),
+            orNull(data.record.operation),
+            orNull(data.record.implement),
+            orNull(data.record.formNumber),
+            orNull(data.record.horaInicio),
+            orNull(data.record.horaFinal),
+            orNull(data.record.horimetroInicial),
+            orNull(data.record.horimetroFinal),
+            orNull(data.record.obs),
             status,
             new Date()
           ]
@@ -122,6 +144,20 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ erro: err.message }));
       }
     });
+    return;
+  }
+
+  if (req.url.startsWith('/api/operacoes/') && req.method === 'DELETE') {
+    const id = req.url.split('/').pop();
+    try {
+      await client.query('DELETE FROM operacoes WHERE id = $1', [id]);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ deletado: true }));
+    } catch (err) {
+      console.log('ERRO ao deletar:', err.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ erro: err.message }));
+    }
     return;
   }
 
