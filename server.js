@@ -54,8 +54,8 @@ const server = http.createServer(async (req, res) => {
         horimetroFinal: row.horimetrofinal,
         obs: row.obs,
         status: row.status,
-        createdAt: row.createdat,
-        updatedAt: row.updatedat,
+        createdAt: new Date(row.createdat).getTime(),
+        updatedAt: new Date(row.updatedat).getTime(),
         date: row.date
       } : {};
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -87,8 +87,8 @@ const server = http.createServer(async (req, res) => {
         obs: r.obs,
         status: r.status,
         synced: true,
-        createdAt: r.createdat,
-        updatedAt: r.updatedat,
+        createdAt: new Date(r.createdat).getTime(),
+        updatedAt: new Date(r.updatedat).getTime(),
         date: r.date,
         fotos: null,
         checklist: null,
