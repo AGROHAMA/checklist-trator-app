@@ -5,7 +5,8 @@
 
    Ao publicar uma correção: basta subir os arquivos atualizados no GitHub Pages. Troque o número da
    versão abaixo (CACHE_VERSION) sempre que fizer uma alteração — isso garante que o cache antigo seja
-   descartado e a versão nova seja usada em todos os aparelhos assim que eles tiverem internet. */
+   descartado e a versão nova seja usada em todos os aparelhos assim que eles tiverem internet.
+   Atualizado em: 2026-10-06 */
 const CACHE_VERSION = 'v16';
 const CACHE_NAME = `agrohama-checklist-${CACHE_VERSION}`;
 
