@@ -117,7 +117,7 @@ const server = http.createServer(async (req, res) => {
 
         await client.query(
           `INSERT INTO operacoes (id, tractor, operator, farm, plot, culture, operation, implement, formnumber, horainicio, horafinal, horimetroinicial, horimetrofinal, obs, status, date, updatedat)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
            ON CONFLICT (id) DO UPDATE SET
              tractor = $2,
              operator = $3,
@@ -134,7 +134,7 @@ const server = http.createServer(async (req, res) => {
              obs = $14,
              status = $15,
              date = $16,
-             updatedat = NOW()`,
+             updatedat = $17`,
           [
             data.record.id,
             orNull(data.record.tractor),
@@ -151,7 +151,8 @@ const server = http.createServer(async (req, res) => {
             orNull(data.record.horimetroFinal),
             orNull(data.record.obs),
             status,
-            new Date()
+            new Date(),
+            new Date().getTime()
           ]
         );
         res.writeHead(200, { 'Content-Type': 'application/json' });
