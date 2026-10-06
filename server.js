@@ -15,7 +15,7 @@ client.connect();
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -69,7 +69,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.url === '/api/operacoes' && req.method === 'GET') {
     try {
-      const result = await client.query('SELECT * FROM operacoes ORDER BY createdAt DESC');
+      const result = await client.query('SELECT * FROM operacoes ORDER BY createdat DESC');
       const normalized = result.rows.map(r => ({
         id: r.id,
         tractor: r.tractor,
@@ -114,6 +114,7 @@ const server = http.createServer(async (req, res) => {
 
         const status = data.evento === 'inicio' ? 'andamento' : data.evento;
         const orNull = (val) => val === '' || val === null ? null : val;
+        const now = new Date().getTime();
 
         await client.query(
           `INSERT INTO operacoes (id, tractor, operator, farm, plot, culture, operation, implement, formnumber, horainicio, horafinal, horimetroinicial, horimetrofinal, obs, status, date, updatedat)
@@ -152,7 +153,7 @@ const server = http.createServer(async (req, res) => {
             orNull(data.record.obs),
             status,
             new Date(),
-            new Date().getTime()
+            now
           ]
         );
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -182,20 +183,20 @@ const server = http.createServer(async (req, res) => {
 
   // Servir arquivos estáticos
   let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
-  
+
   fs.readFile(filePath, (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ erro: 'Não encontrado' }));
       return;
     }
-    
+
     const ext = path.extname(filePath);
-    const contentType = ext === '.html' ? 'text/html' : 
+    const contentType = ext === '.html' ? 'text/html' :
                        ext === '.js' ? 'application/javascript' :
                        ext === '.json' ? 'application/json' :
                        'text/plain';
-    
+
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(data);
   });
