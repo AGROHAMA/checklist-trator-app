@@ -418,13 +418,7 @@
     </div>
 
     <div class="settings-block">
-      <h3>Integração com Backend / Banco de Dados</h3>
-      <div class="field">
-        <label>URL do Backend (novo sistema)</label>
-        <input type="url" id="backendUrl" placeholder="http://192.168.1.70:3000">
-        <div class="hint">URL do servidor Backend. Ex: http://192.168.1.70:3000 ou https://seu-dominio.com. Se preenchido, o app sincroniza com o banco de dados central em vez do Power Automate.</div>
-      </div>
-      <h3 style="margin-top:18px;">Integração com Teams (Legacy)</h3>
+      <h3>Integração com Teams (Power Automate)</h3>
       <div class="field">
         <label>URL de automação (webhook / Power Automate)</label>
         <input type="url" id="webhookUrl" placeholder="https://...">
@@ -793,8 +787,8 @@ function saveRecords(records){
   }
 }
 function loadSettings(){
-  try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {webhookUrl:'', webhookUrlManut:'', autoSync:false, backendUrl:''}; }
-  catch(e){ return {webhookUrl:'', webhookUrlManut:'', autoSync:false, backendUrl:''}; }
+  try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {webhookUrl:'', webhookUrlManut:'', autoSync:true}; }
+  catch(e){ return {webhookUrl:'', webhookUrlManut:'', autoSync:true}; }
 }
 function saveSettingsObj(s){
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
@@ -1361,26 +1355,6 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-/* ===================== Consulta de Operações Abertas (Backend) ===================== */
-function consultarOperacoesAbertas(tratorNome){
-  if(!settings.backendUrl || !tratorNome.trim()) return;
-  const backendUrl = settings.backendUrl.replace(/\/$/, '');
-  fetch(`${backendUrl}/api/operacoes-abertas?trator=${encodeURIComponent(tratorNome.trim())}`, {
-    timeout: 4000
-  }).then(resp=>{
-    if(!resp.ok) return null;
-    return resp.json();
-  }).then(data=>{
-    if(!data) return;
-    const msg = `⚠️ Já existe uma operação em aberto nesse trator!\n`
-      + `Operador: ${data.operador || 'N/A'}\n`
-      + `Horário: ${data.horaInicio || 'N/A'}\n`
-      + `Horímetro inicial: ${data.horimetro || 'N/A'}\n\n`
-      + `Confirme com essa pessoa antes de iniciar uma nova operação.`;
-    toast(msg, 5000);
-  }).catch(()=>{});
-}
-
 function onTractorFieldChange(tratorVal){
   const ref = resolveMachineRefForTractor(tratorVal);
   if(ref){
@@ -1688,10 +1662,6 @@ function deleteRecord(id){
   records = records.filter(r=>r.id!==id);
   saveRecords(records);
   render();
-  if(settings.backendUrl){
-    const backendUrl = settings.backendUrl.replace(/\/$/, '');
-    fetch(`${backendUrl}/api/operacoes/${id}`, { method: 'DELETE' }).catch(()=>{});
-  }
 }
 
 /* ===================== Texto para Teams (mesmo padrão da skill relatorio-operacao-agricola) ===================== */
@@ -1853,45 +1823,40 @@ function fallbackCopy(text){
 // estava em andamento (retryPendingSyncs entra em ação de novo antes do primeiro terminar).
 const syncInFlight = new Set();
 function attemptSync(record, eventType, force){
-  // Prioriza Backend novo se configurado; senão usa Power Automate legacy
-  const backendUrl = settings.backendUrl ? settings.backendUrl.replace(/\/$/, '') : null;
-  const legacyUrl = settings.webhookUrl;
+  const webhookUrl = settings.webhookUrl;
 
-  if(!backendUrl && !legacyUrl) return null;
-  if(!force){
-    if(!settings.autoSync) return null;
-    if(!navigator.onLine) return null;
-  }
-  if(record.synced) return null;
+  if(!webhookUrl) { console.log('Webhook PowerAutomate não configurado'); return null; }
+  if(!force && !settings.autoSync) { console.log('AutoSync desativado'); return null; }
+  if(!force && !navigator.onLine) { console.log('Offline'); return null; }
+  if(record.synced) { console.log('Já sincronizado'); return null; }
   if(syncInFlight.has(record.id)) return null;
   syncInFlight.add(record.id);
 
-  const endpoint = backendUrl ? `${backendUrl}/api/operacoes` : legacyUrl;
-  const payload = backendUrl
-    ? {
-        evento: eventType,
-        record: record
-      }
-    : {
-        evento: eventType,
-        texto: buildTeamsText(record),
-        registro: record
-      };
+  const payload = {
+    evento: eventType,
+    texto: buildTeamsText(record),
+    registro: record
+  };
 
-  return fetch(endpoint, {
+  console.log('Enviando para PowerAutomate:', webhookUrl);
+  return fetch(webhookUrl, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(payload),
-    timeout: 8000
+    timeout: 30000
   }).then(resp=>{
+    console.log('Resposta PowerAutomate:', resp.status);
     if(resp.ok){
       record.synced = true;
       saveRecords(records);
       render();
+      return true;
     }
-    return resp.ok;
-  }).catch(()=>false)
-  .finally(()=>{ syncInFlight.delete(record.id); });
+    return false;
+  }).catch(err=>{
+    console.error('Erro PowerAutomate:', err);
+    return false;
+  }).finally(()=>{ syncInFlight.delete(record.id); });
 }
 // Best-effort: avisa o fluxo "Cadastro e Alerta de Manutencao" sempre que uma operação é finalizada,
 // pra atualizar o horímetro atual do trator no SharePoint (não importa o aparelho/operador) e disparar
@@ -2002,7 +1967,7 @@ function manualSendPending(){
     else toast(`${ok} de ${total} enviado(s). O restante continua sem internet — tente de novo depois.`);
   });
 }
-window.addEventListener('online', ()=>{ updateConnStatus(); retryPendingSyncs(); loadFromBackend(); checkMaintenanceAlerts(); });
+window.addEventListener('online', ()=>{ updateConnStatus(); retryPendingSyncs(); checkMaintenanceAlerts(); });
 window.addEventListener('offline', updateConnStatus);
 function updateConnStatus(){
   const el = document.getElementById('connStatus');
@@ -2124,7 +2089,6 @@ function switchTab(tab){
   document.getElementById('tabSettings').classList.toggle('active', tab==='settings');
   document.getElementById('mainEl').classList.toggle('wide', tab==='week');
   if(tab==='settings'){
-    document.getElementById('backendUrl').value = settings.backendUrl || '';
     document.getElementById('webhookUrl').value = settings.webhookUrl || '';
     document.getElementById('webhookUrlManut').value = settings.webhookUrlManut || '';
     document.getElementById('autoSyncToggle').checked = !!settings.autoSync;
@@ -2140,13 +2104,12 @@ function switchTab(tab){
   }
 }
 function saveSettings(){
-  settings.backendUrl = document.getElementById('backendUrl').value.trim();
   settings.webhookUrl = document.getElementById('webhookUrl').value.trim();
   settings.webhookUrlManut = document.getElementById('webhookUrlManut').value.trim();
   settings.autoSync = document.getElementById('autoSyncToggle').checked;
   saveSettingsObj(settings);
   toast('Ajustes salvos.');
-  retryPendingSyncs(); loadFromBackend();
+  retryPendingSyncs();
   updatePendingSyncButton();
 }
 
@@ -2441,49 +2404,6 @@ function ackHorimetroLembrete(){
   horimetroLembreteAtivo = null;
   closeModal('modalHorimetroLembrete');
 }
-/* ===================== Carregar dados do Backend ===================== */
-let loadFromBackendTimer = null;
-function loadFromBackend(){
-  if(!settings.backendUrl) return;
-  clearTimeout(loadFromBackendTimer);
-  loadFromBackendTimer = setTimeout(() => {
-    const backendUrl = settings.backendUrl.replace(/\/$/, '');
-    fetch(`${backendUrl}/api/operacoes`)
-      .then(resp => resp.json())
-      .then(data => {
-        if(Array.isArray(data)){
-          const serverIds = new Set(data.map(r => r.id));
-
-          // Atualiza ou adiciona registros do servidor
-          data.forEach(serverRec => {
-            const local = records.find(r => r.id === serverRec.id);
-            if(!local){
-              records.push(serverRec);
-              knownRecordIds.add(serverRec.id);
-            } else {
-              // Atualiza se servidor tem versão mais recente
-              const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
-              const serverTime = new Date(serverRec.updatedAt || serverRec.createdAt || 0).getTime();
-              if(serverTime >= localTime){
-                Object.assign(local, serverRec);
-              }
-            }
-          });
-
-          // Remove registros que foram deletados no servidor
-          for(let i = records.length - 1; i >= 0; i--){
-            if(!serverIds.has(records[i].id)){
-              records.splice(i, 1);
-            }
-          }
-
-          if(data.length > 0 || records.length > 0) saveRecords(records);
-          render();
-        }
-      })
-      .catch(()=>{});
-  }, 500);
-}
 /* ===================== Init ===================== */
 // Pede ao navegador para NÃO apagar automaticamente os dados deste app quando o aparelho ficar
 // com pouco espaço (isso pode acontecer sozinho em tablets cheios de fotos/apps). Não garante
@@ -2500,14 +2420,13 @@ updatePendingSyncButton();
 // quando o aparelho "percebe" que voltou a ficar online): sem isso, se o app foi fechado ainda
 // offline e reaberto já com internet, o pendente só saía do lugar quando alguém tocasse manualmente
 // em "Enviar pendências agora" — o que fazia o aviso de pendência parecer acumular sozinho.
-retryPendingSyncs(); loadFromBackend();
+retryPendingSyncs();
 checkHorimetroLembrete();
 setInterval(checkHorimetroLembrete, 30000);
-setInterval(() => { if(settings.backendUrl) loadFromBackend(); }, 15000);
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible'){
     checkHorimetroLembrete();
-    retryPendingSyncs(); loadFromBackend();
+    retryPendingSyncs();
   }
 });
 
