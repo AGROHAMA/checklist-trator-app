@@ -5,9 +5,8 @@
 
    Ao publicar uma correção: basta subir os arquivos atualizados no GitHub Pages. Troque o número da
    versão abaixo (CACHE_VERSION) sempre que fizer uma alteração — isso garante que o cache antigo seja
-   descartado e a versão nova seja usada em todos os aparelhos assim que eles tiverem internet.
-   Atualizado em: 2026-10-06 */
-const CACHE_VERSION = 'v16';
+   descartado e a versão nova seja usada em todos os aparelhos assim que eles tiverem internet. */
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = `agrohama-checklist-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -40,6 +39,86 @@ self.addEventListener('activate', (event) => {
       ))
       .then(() => self.clients.claim())
   );
+});
+
+/* ===================== Envio em segundo plano (Background Sync) =====================
+   O app espelha tudo que está pendente numa "caixa de saída" no IndexedDB ("agrohama-outbox",
+   store "outbox"). Quando o navegador detecta que a conexão voltou, ele acorda este service worker
+   com o evento "sync" (tag "outbox-sync") MESMO COM O APP FECHADO, e aqui mandamos cada item direto
+   pro webhook do Power Automate. O que deu certo vai pro store "sent"; o app lê isso na próxima
+   abertura e marca os registros como sincronizados (sem reenviar). */
+function obOpen(){
+  return new Promise((resolve, reject) => {
+    const q = indexedDB.open('agrohama-outbox', 1);
+    q.onupgradeneeded = () => {
+      const db = q.result;
+      if (!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('sent')) db.createObjectStore('sent', { keyPath: 'key' });
+    };
+    q.onsuccess = () => resolve(q.result);
+    q.onerror = () => reject(q.error);
+  });
+}
+function obAll(db) {
+  return new Promise((resolve, reject) => {
+    const r = db.transaction('outbox', 'readonly').objectStore('outbox').getAll();
+    r.onsuccess = () => resolve(r.result || []);
+    r.onerror = () => reject(r.error);
+  });
+}
+// Marca como enviado SOMENTE se o item na caixa de saída ainda for exatamente o que foi enviado
+// (se o operador alterou o registro nesse meio tempo, o item novo continua na fila).
+function obMarkSent(db, item) {
+  return new Promise((resolve) => {
+    let igual = false;
+    const tx = db.transaction(['outbox', 'sent'], 'readwrite');
+    const out = tx.objectStore('outbox');
+    out.get(item.key).onsuccess = (ev) => {
+      const atual = ev.target.result;
+      if (atual && atual.body === item.body) {
+        igual = true;
+        out.delete(item.key);
+        tx.objectStore('sent').put({ key: item.key, t: Date.now() });
+      }
+    };
+    tx.oncomplete = () => resolve(igual);
+    tx.onerror = tx.onabort = () => resolve(false);
+  });
+}
+async function flushOutbox() {
+  const db = await obOpen();
+  let falhou = false;
+  try {
+    const itens = await obAll(db);
+    for (const item of itens) {
+      try {
+        const resp = await fetch(item.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: item.body
+        });
+        if (resp.ok) {
+          const igual = await obMarkSent(db, item);
+          if (!igual) falhou = true; // o registro mudou durante o envio: manda a versão nova na próxima volta
+        } else {
+          falhou = true;
+        }
+      } catch (e) {
+        falhou = true;
+      }
+    }
+  } finally {
+    db.close();
+  }
+  try {
+    const clientes = await self.clients.matchAll({ includeUncontrolled: true });
+    clientes.forEach((c) => c.postMessage({ type: 'outbox-flushed' }));
+  } catch (e) { /* sem janelas abertas: tudo bem */ }
+  // Lançar erro faz o navegador reagendar o "sync" automaticamente (com intervalo crescente).
+  if (falhou) throw new Error('outbox: ainda há itens pendentes');
+}
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'outbox-sync') event.waitUntil(flushOutbox());
 });
 
 self.addEventListener('fetch', (event) => {
