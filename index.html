@@ -732,7 +732,7 @@ function loadBackup(){
 // "KH94". O valor guardado no aparelho não muda (continua batendo com o cadastro de manutenção).
 function fmtFrota(t){
   if(t === undefined || t === null) return t;
-  return String(t).trim().toUpperCase().replace(/^([A-ZÀ-Ý]+)[\s\-]+(\d+)$/, '$1$2');
+  return String(t).trim().toUpperCase().replace(/^([A-ZÀ-Ý]+)[\s\.\-]+(\d+)$/, '$1$2');
 }
 function registroParaEnvio(r){
   return Object.assign({}, r, {tractor: fmtFrota(r.tractor)});
@@ -955,7 +955,8 @@ const MAINT_KEY = 'agrohama_manutencao_v1';
 // Lista pré-preenchida a partir do relatório de bens da Agrohama (Fazenda Treis Coringas).
 // Serve só como sugestão no campo "Trator" — pode digitar qualquer coisa que não esteja aqui.
 // campo "ref" = número de referência de 3 dígitos usado na numeração do talão (ref+dia+mês+ano2+hora+minuto).
-// null = ainda não participa dessa numeração (fora do escopo atual: só tratores KH/M e veículos).
+// null = ainda não participa dessa numeração (fora do escopo atual: só tratores KH/M, motores MT e veículos).
+// Atualizada em 14/10/2026 a partir do relatório "Bens e Direitos - Analítico" (Realtec). Motores MT 01–09 = ref 201–209.
 const MASTER_EQUIPAMENTOS = [
   {codigo:'M.01', descricao:'Trator 7500 SLC — John Deere', ref:'001'},
   {codigo:'M.02', descricao:'Trator TL 85 E — New Holland', ref:'002'},
@@ -988,6 +989,15 @@ const MASTER_EQUIPAMENTOS = [
   {codigo:'KH 96', descricao:'Trator 7M215 — John Deere', ref:'096'},
   {codigo:'KH 97', descricao:'Trator TL 5.80C — New Holland', ref:'097'},
   {codigo:'KH 98', descricao:'Trator T6 130 Cabinado — New Holland', ref:'098'},
+  {codigo:'MT 01', descricao:'Motor Gerador Perkins 4 Cilindros (móvel)', ref:'201'},
+  {codigo:'MT 02', descricao:'Motor Irrigação MWM X12 — Arapongas', ref:'202'},
+  {codigo:'MT 03', descricao:'Motor Gerador Perkins 3 Cilindros (móvel)', ref:'203'},
+  {codigo:'MT 04', descricao:'Motor Gerador MWM 3 Cilindros (móvel)', ref:'204'},
+  {codigo:'MT 05', descricao:'Motor Irrigação Scania', ref:'205'},
+  {codigo:'MT 06', descricao:'Motor Irrigação MWM X10 4 Cilindros — Recalque Capão', ref:'206'},
+  {codigo:'MT 07', descricao:'Motor Irrigação MWM 6 Cilindros — Captação Capão', ref:'207'},
+  {codigo:'MT 08', descricao:'Motor Gerador GMG — Chácara', ref:'208'},
+  {codigo:'MT 09', descricao:'Motor Gerador MWM 3 Cilindros (móvel)', ref:'209'},
   {codigo:'NH 29', descricao:'Colhedeira de Tubérculos Batata — Hennipman', ref:null},
   {codigo:'NH 06', descricao:'Colhedora de Batata Arrasto — Watanabe', ref:null},
   {codigo:'BLY-3206', descricao:'Caminhão Caçamba Cristina D68', ref:'100'},
@@ -1009,15 +1019,25 @@ const MASTER_EQUIPAMENTOS = [
   {codigo:'SYR4I45', descricao:'Argo — Fiat', ref:'116'},
   {codigo:'QUM-8575', descricao:'Jeep Compass', ref:'117'},
   {codigo:'FNJ-2024', descricao:'Kombi — Volkswagen', ref:'118'},
-  {codigo:'TYF1C16', descricao:'Mobi Like — Fiat', ref:'119'}
+  {codigo:'TYF1C16', descricao:'Mobi Like — Fiat', ref:'119'},
+  {codigo:'HOA-6688', descricao:'Strada Adventure — Fiat', ref:'120'},
+  {codigo:'QUF8G50', descricao:'Doblo — Fiat', ref:'121'}
 ];
+// Chave de comparação tolerante: ignora maiúsculas, espaços, pontos, hífens e zeros à esquerda do número.
+// "MT01", "mt 01", "MT-01" e "M.T. 1" dão a mesma chave ("mt1"); "KH 094", "kh94" e "KH-94" também ("kh94").
+// Placas (ex.: "BLY-3206", "FUY1G77") só perdem espaço/hífen/ponto.
+function normEquip(s){
+  const t = String(s === undefined || s === null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const m = t.match(/^([a-z]+)0*(\d{1,3})$/);
+  return m ? m[1] + m[2] : t;
+}
 function findMasterEquip(codigo){
   if(!codigo) return null;
-  const alvo = codigo.trim().toLowerCase();
-  return MASTER_EQUIPAMENTOS.find(e => e.codigo.trim().toLowerCase() === alvo) || null;
+  const alvo = normEquip(codigo);
+  return MASTER_EQUIPAMENTOS.find(e => normEquip(e.codigo) === alvo) || null;
 }
 // Sugere o número de referência de 3 dígitos pra um trator/veículo: usa a lista conhecida primeiro;
-// se não encontrar, tenta inferir pelo padrão "KH ##" ou "M.0#" (mesma convenção usada pelos já cadastrados).
+// se não encontrar, tenta inferir pelo padrão "KH ##", "M.0#" ou "MT ##" (mesma convenção usada pelos já cadastrados).
 function suggestMachineRef(codigo){
   if(!codigo) return '';
   const known = findMasterEquip(codigo);
@@ -1027,6 +1047,8 @@ function suggestMachineRef(codigo){
   if(m) return m[1].padStart(3, '0');
   m = semEspaco.match(/^m\.?\s*0*(\d{1,2})$/i);
   if(m) return m[1].padStart(3, '0');
+  m = semEspaco.match(/^m\.?\s*t\.?[\s\-]*0*(\d{1,2})$/i);   // motores MT ##: ref 201–299
+  if(m) return String(200 + parseInt(m[1], 10));
   return '';
 }
 function buildEquipDatalist(){
@@ -1047,10 +1069,10 @@ let maintConfigs = loadMaint();
 // Maior horímetro conhecido para um trator/máquina, a partir dos registros de operação já lançados.
 function getCurrentHorimetro(tratorNome){
   if(!tratorNome) return null;
-  const alvo = tratorNome.trim().toLowerCase();
+  const alvo = normEquip(tratorNome);
   let max = null;
   records.forEach(r=>{
-    if(!r.tractor || r.tractor.trim().toLowerCase() !== alvo) return;
+    if(!r.tractor || normEquip(r.tractor) !== alvo) return;
     [r.horimetroFinal, r.horimetroInicial].forEach(v=>{
       const n = parseFloat(v);
       if(!isNaN(n) && (max === null || n > max)) max = n;
@@ -1087,8 +1109,8 @@ function maintStatusLabel(status){
    mesmo minuto. */
 function findMaintConfig(tratorNome){
   if(!tratorNome) return null;
-  const alvo = tratorNome.trim().toLowerCase();
-  return maintConfigs.find(c => c.trator && c.trator.trim().toLowerCase() === alvo) || null;
+  const alvo = normEquip(tratorNome);
+  return maintConfigs.find(c => c.trator && normEquip(c.trator) === alvo) || null;
 }
 // Descobre a referência da máquina pra um trator/veículo digitado: usa o cadastro da Manutenção se
 // existir; senão tenta sugerir pela lista conhecida / padrão KH ##, M.0# (mesma lógica do cadastro).
@@ -1167,7 +1189,7 @@ function saveMaintConfig(){
     return;
   }
   const machineRef = machineRefRaw ? machineRefRaw.padStart(3, '0') : null;
-  if(machineRef && maintConfigs.some(c => c.machineRef === machineRef && c.trator.trim().toLowerCase() !== trator.toLowerCase())){
+  if(machineRef && maintConfigs.some(c => c.machineRef === machineRef && normEquip(c.trator) !== normEquip(trator))){
     toast(`Esse número de referência (${machineRef}) já está em uso por outro equipamento — escolha outro, senão os talões vão colidir.`);
     return;
   }
