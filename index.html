@@ -261,6 +261,19 @@
   .photo-optional-tag{font-size:10.5px;font-weight:700;color:var(--gray-700);background:var(--gray-200);padding:2px 7px;border-radius:999px;}
   .problema-box{background:var(--red-100);border:1.5px solid var(--red-500);border-radius:9px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;color:var(--gray-900);}
   .problema-box b{color:var(--red-500);}
+  .live-panel{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px;border-left:5px solid var(--green-600);}
+  .live-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .live-head b{font-size:14px;}
+  .live-refresh{background:transparent;border:1.5px solid var(--gray-200);border-radius:8px;padding:4px 9px;font-size:13px;color:var(--gray-700);cursor:pointer;}
+  .live-meta{font-size:11px;color:var(--gray-400);margin-top:3px;}
+  .live-item{border-top:1px solid var(--gray-200);margin-top:9px;padding-top:9px;font-size:12.5px;color:var(--gray-700);}
+  .live-item .live-top{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:var(--gray-900);}
+  .live-item .live-dur{font-size:12px;font-weight:700;color:var(--green-700);white-space:nowrap;}
+  .live-item.is-stale .live-dur{color:var(--red-500);}
+  .live-item.is-stale{background:var(--red-100);border-radius:8px;padding:9px 8px;}
+  .live-item.is-mine .live-top b::after{content:' · este aparelho';font-weight:400;font-size:11px;color:var(--gray-400);}
+  .live-empty{font-size:12.5px;color:var(--gray-700);margin-top:8px;}
+  .hint-warn{color:var(--red-500) !important;font-weight:600 !important;}
 
   /* Manutenção por horímetro */
   .maint-alert{border-radius:9px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -326,6 +339,8 @@
     <div class="actions-row" id="pendingSyncRow" style="display:none;">
       <button class="btn btn-secondary btn-block" id="pendingSyncBtn" onclick="manualSendPending()">📤 Enviar pendências agora</button>
     </div>
+
+    <div id="sharedPanel"></div>
 
     <div id="maintBanner"></div>
 
@@ -420,6 +435,16 @@
         <label>URL de automação — Manutenção (webhook / Power Automate)</label>
         <input type="url" id="webhookUrlManut" placeholder="https://...">
         <div class="hint">Cole aqui a URL do fluxo "Cadastro e Alerta de Manutencao". Configure em TODOS os aparelhos: sempre que alguém finalizar uma operação neste aparelho, o horímetro atual do trator é enviado automaticamente pra SharePoint e o app dispara o aviso de manutenção no Teams — não importa qual aparelho ou operador finalizou.</div>
+      </div>
+      <div class="field">
+        <label>URL — Gravar evento da máquina (início/fim)</label>
+        <input type="url" id="evGravarUrl" placeholder="https://...">
+        <div class="hint">Cole a URL do fluxo "Checklist Maquinas - Gravar Evento". Cada início e fim de operação é gravado como um arquivo na pasta CHECKLIST_TRATOR/eventos do site de manutenção de máquinas agrícolas.</div>
+      </div>
+      <div class="field">
+        <label>URL — Listar eventos (máquinas em operação)</label>
+        <input type="url" id="evListarUrl" placeholder="https://...">
+        <div class="hint">Cole a URL do fluxo "Checklist Maquinas - Listar Eventos". Com ela, todos os aparelhos veem quais máquinas estão em operação agora e usam o mesmo horímetro. Configure as DUAS URLs em todos os aparelhos.</div>
       </div>
       <div class="switch-row">
         <div>
@@ -531,6 +556,7 @@
       <div class="field">
         <label>Horímetro Inicial</label>
         <input type="text" inputmode="decimal" id="f_horimetroInicial" placeholder="ex: 610.3" oninput="sanitizeDecimalInput(this)">
+        <div class="hint" id="f_horimetroHint"></div>
       </div>
 
       <div class="orientacao-box">
@@ -781,11 +807,12 @@ function mirrorOutbox(){
           body: JSON.stringify({evento: eventoParaRegistro(r), texto: buildTeamsText(r), registro: registroParaEnvio(r)})});
       });
     }
+    eventosPendentes().forEach(p=>{ wanted.push({key:p.key, url:settings.evGravarUrl, body:p.body}); });
     if(settings.webhookUrlManut){
       records.filter(r=>r && r.id && r.status==='concluido' && !r.horimetroSynced && r.tractor
         && r.horimetroFinal !== '' && r.horimetroFinal !== undefined && r.horimetroFinal !== null).forEach(r=>{
         wanted.push({key:'h:'+r.id, url:settings.webhookUrlManut,
-          body: JSON.stringify({evento:'horimetro_atualizado', trator:r.tractor, horimetroFinal:r.horimetroFinal})});
+          body: JSON.stringify({evento:'horimetro_atualizado', trator:nomeParaManutencao(r.tractor), horimetroFinal:r.horimetroFinal})});
       });
     }
   }catch(e){ return; } // ex.: chamado antes das configurações carregarem
@@ -831,6 +858,8 @@ function reconcileOutbox(){
       if(!r) return;
       if(String(s.key).indexOf('r:') === 0 && !r.synced){ r.synced = true; mudou = true; qtd++; }
       if(String(s.key).indexOf('h:') === 0 && !r.horimetroSynced){ r.horimetroSynced = true; mudou = true; }
+      if(String(s.key).indexOf('i:') === 0 && !r.evInicioSynced){ r.evInicioSynced = true; mudou = true; }
+      if(String(s.key).indexOf('f:') === 0 && !r.evFimSynced){ r.evFimSynced = true; mudou = true; }
     });
     if(mudou){
       saveRecords(records);
@@ -905,13 +934,13 @@ function saveRecords(records){
    O envio automático é sempre ligado quando existe URL configurada (o operador não precisa
    ativar nem tocar em nada). */
 function applyFixedSettings(s){
-  if(s.webhookUrl || s.webhookUrlManut) s.autoSync = true;
+  if(s.webhookUrl || s.webhookUrlManut || s.evGravarUrl || s.evListarUrl) s.autoSync = true;
   return s;
 }
 function loadSettings(){
   let s;
-  try{ s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {webhookUrl:'', webhookUrlManut:'', autoSync:false}; }
-  catch(e){ s = {webhookUrl:'', webhookUrlManut:'', autoSync:false}; }
+  try{ s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {webhookUrl:'', webhookUrlManut:'', evGravarUrl:'', evListarUrl:'', autoSync:false}; }
+  catch(e){ s = {webhookUrl:'', webhookUrlManut:'', evGravarUrl:'', evListarUrl:'', autoSync:false}; }
   return applyFixedSettings(s);
 }
 function saveSettingsObj(s){
@@ -949,6 +978,191 @@ let knownRecordIds = new Set(records.map(r => r && r.id));
 let settings = loadSettings();
 if(!settings.adminPin) settings.adminPin = '';
 let currentFilter = 'hoje';
+
+/* ===================== Operações compartilhadas entre aparelhos (v14) =====================
+   Cada início e cada fim de operação vira um arquivo JSON (um por evento) na pasta
+   CHECKLIST_TRATOR/eventos do site de manutenção de máquinas agrícolas, via fluxo "Gravar Evento".
+   O fluxo "Listar Eventos" devolve todos os arquivos. "Em operação" = início sem fim correspondente.
+   O horímetro "único" de cada máquina é o maior valor visto nesses eventos + nos registros locais. */
+const EV_CACHE_KEY = 'agrohama_ev_cache_v1';
+const EV_CANCEL_KEY = 'agrohama_ev_cancel_v1';
+const ALERTA_HORAS_ABERTA = 14; // operação aberta há mais que isso fica em vermelho no painel
+function loadEvCache(){
+  try{ const c = JSON.parse(localStorage.getItem(EV_CACHE_KEY)); if(c && Array.isArray(c.list)) return c; }catch(e){}
+  return {t:0, list:[]};
+}
+let evCache = loadEvCache();
+let sharedEvents = evCache.list;
+let evErro = false, evRefreshing = false;
+function parseEvList(data){
+  if(data && !Array.isArray(data) && Array.isArray(data.body)) data = data.body;
+  if(!Array.isArray(data)) return [];
+  const out = [];
+  data.forEach(it=>{
+    try{
+      if(typeof it === 'string') it = JSON.parse(it);
+      if(it && it.registro && typeof it.registro === 'object') it = it.registro;
+      if(it && typeof it === 'object' && it.id) out.push(it);
+    }catch(e){}
+  });
+  return out;
+}
+function evInicio(r){
+  return {id:'i_'+r.id, tipo:'inicio', refOp:r.id, maquina:nomeParaManutencao(r.tractor), operador:r.operator||'',
+    fazenda:r.farm||'', talhao:r.plot||'', cultura:r.culture||'', operacao:r.operation||'', implemento:r.implement||'',
+    data:r.date, horaInicio:r.horaInicio||'', horimetroInicial:r.horimetroInicial, talao:r.formNumber||'', criadoEm:r.createdAt};
+}
+function evFim(r){
+  return {id:'f_'+r.id, tipo:'fim', refInicio:'i_'+r.id, refOp:r.id, maquina:nomeParaManutencao(r.tractor), operador:r.operator||'',
+    data:r.date, dataFim:r.dataFim||r.date, horaFinal:r.horaFinal||'', horimetroFinal:r.horimetroFinal, criadoEm:r.updatedAt};
+}
+function evCancelamento(refInicio, maquina, motivo){
+  return {id:'f_x_'+String(refInicio).slice(2)+'_'+Date.now().toString(36), tipo:'fim', refInicio, maquina:nomeParaManutencao(maquina),
+    cancelado:true, motivo, dataFim:todayISO(), horaFinal:nowHM(), criadoEm:Date.now()};
+}
+function eventosPendentes(){
+  const out = [];
+  if(!settings.evGravarUrl) return out;
+  records.forEach(r=>{
+    if(!r || !r.id || !r.compart || !r.tractor) return;
+    if(!r.evInicioSynced) out.push({key:'i:'+r.id, rec:r, flag:'evInicioSynced', body:JSON.stringify({registro:evInicio(r)})});
+    if(r.status === 'concluido' && !r.evFimSynced) out.push({key:'f:'+r.id, rec:r, flag:'evFimSynced', body:JSON.stringify({registro:evFim(r)})});
+  });
+  return out;
+}
+function loadCancels(){ try{ return JSON.parse(localStorage.getItem(EV_CANCEL_KEY)) || []; }catch(e){ return []; } }
+function saveCancels(l){ try{ localStorage.setItem(EV_CANCEL_KEY, JSON.stringify(l)); }catch(e){} }
+function queueCancel(reg){
+  const l = loadCancels(); l.push(reg); saveCancels(l);
+  return sendCancels(true);
+}
+function sendCancels(force){
+  if(!settings.evGravarUrl) return Promise.resolve([]);
+  if(!force && !navigator.onLine) return Promise.resolve([]);
+  const ps = loadCancels().filter(c=>!syncInFlight.has('c:'+c.id)).map(c=>{
+    syncInFlight.add('c:'+c.id);
+    return fetch(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({registro:c})})
+      .then(resp=>{
+        if(resp.ok){
+          saveCancels(loadCancels().filter(x=>x.id !== c.id));
+          sharedEvents = sharedEvents.concat([c]);
+        }
+        return resp.ok;
+      }).catch(()=>false).finally(()=>syncInFlight.delete('c:'+c.id));
+  });
+  return Promise.all(ps).then(r=>{ if(r.some(Boolean)){ try{ render(); updatePendingSyncButton(); }catch(e){} } return r; });
+}
+function sendEventos(force){
+  if(!settings.evGravarUrl) return Promise.resolve([]);
+  if(!force && !navigator.onLine) return Promise.resolve([]);
+  const ps = eventosPendentes().filter(p=>!syncInFlight.has(p.key)).map(p=>{
+    syncInFlight.add(p.key);
+    return fetch(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:p.body})
+      .then(resp=>{
+        if(resp.ok){ p.rec[p.flag] = true; saveRecords(records); }
+        else armBackgroundSync();
+        return resp.ok;
+      }).catch(()=>{ armBackgroundSync(); return false; })
+      .finally(()=>syncInFlight.delete(p.key));
+  });
+  return Promise.all(ps).then(r=>{ if(r.some(Boolean)){ try{ updatePendingSyncButton(); }catch(e){} refreshShared(true); } return r; });
+}
+function refreshShared(force){
+  if(!settings.evListarUrl){ try{ renderSharedPanel(); }catch(e){} return Promise.resolve(); }
+  if(evRefreshing) return Promise.resolve();
+  if(!force && !navigator.onLine){ try{ renderSharedPanel(); }catch(e){} return Promise.resolve(); }
+  evRefreshing = true;
+  return fetch(settings.evListarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+    .then(resp=>{ if(!resp.ok) throw new Error('http ' + resp.status); return resp.json(); })
+    .then(data=>{
+      const list = parseEvList(data);
+      evCache = {t:Date.now(), list};
+      sharedEvents = list;
+      evErro = false;
+      try{ localStorage.setItem(EV_CACHE_KEY, JSON.stringify(evCache)); }catch(e){}
+    })
+    .catch(()=>{ evErro = true; })
+    .finally(()=>{ evRefreshing = false; try{ render(); }catch(e){} });
+}
+function evTs(e){
+  const t = new Date((e.data||'') + 'T' + (e.horaInicio||'00:00') + ':00').getTime();
+  return isNaN(t) ? (e.criadoEm || Date.now()) : t;
+}
+function operacoesAbertas(){
+  const fechados = new Set();
+  sharedEvents.forEach(e=>{ if(e && e.tipo === 'fim' && e.refInicio) fechados.add(e.refInicio); });
+  loadCancels().forEach(c=>fechados.add(c.refInicio));
+  records.forEach(r=>{ if(r && r.compart && r.status === 'concluido') fechados.add('i_'+r.id); });
+  const map = new Map();
+  sharedEvents.forEach(e=>{
+    if(e && e.tipo === 'inicio' && e.id && e.maquina && !fechados.has(e.id)){
+      map.set(e.id, {id:e.id, maquina:e.maquina, operador:e.operador, ts:evTs(e), horimetroInicial:e.horimetroInicial,
+        talhao:e.talhao, implemento:e.implemento, fazenda:e.fazenda, local:false});
+    }
+  });
+  records.forEach(r=>{
+    if(r && r.compart && r.status === 'andamento' && r.tractor && !fechados.has('i_'+r.id)){
+      map.set('i_'+r.id, {id:'i_'+r.id, maquina:nomeParaManutencao(r.tractor), operador:r.operator, ts:evTs({data:r.date, horaInicio:r.horaInicio, criadoEm:r.createdAt}),
+        horimetroInicial:r.horimetroInicial, talhao:r.plot, implemento:r.implement, fazenda:r.farm, local:true});
+    }
+  });
+  return Array.from(map.values()).sort((a,b)=>a.ts-b.ts);
+}
+function fmtDur(ms){
+  const m = Math.max(0, Math.floor(ms/60000));
+  const h = Math.floor(m/60);
+  return h >= 24 ? `${Math.floor(h/24)}d ${h%24}h` : `${h}h ${String(m%60).padStart(2,'0')}min`;
+}
+function renderSharedPanel(){
+  const el = document.getElementById('sharedPanel');
+  if(!el) return;
+  if(!settings.evListarUrl){ el.innerHTML = ''; return; }
+  const ops = operacoesAbertas();
+  const agora = Date.now();
+  let meta;
+  if(evRefreshing) meta = 'atualizando…';
+  else if(!evCache.t) meta = evErro ? 'sem conexão — ainda não carregou' : 'carregando…';
+  else {
+    const hh = new Date(evCache.t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    meta = evErro ? `sem conexão — mostrando dados das ${hh}` : `atualizado às ${hh}`;
+  }
+  const itens = ops.map(o=>{
+    const dur = agora - o.ts;
+    const stale = dur > ALERTA_HORAS_ABERTA*3600*1000;
+    const desde = new Date(o.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const onde = [o.talhao, o.implemento].filter(Boolean).map(escapeHtml).join(' · ');
+    const hi = (o.horimetroInicial !== '' && o.horimetroInicial !== undefined && o.horimetroInicial !== null) ? ` · horímetro inicial <b>${escapeHtml(o.horimetroInicial)}</b>` : '';
+    const btn = (stale && !o.local) ? `<div style="margin-top:7px;"><button class="btn btn-ghost btn-sm" onclick="encerrarPeloPainel('${escapeHtml(o.id)}')">Encerrar (operação esquecida)</button></div>` : '';
+    return `<div class="live-item${stale?' is-stale':''}${o.local?' is-mine':''}">
+      <div class="live-top"><b>🚜 ${escapeHtml(o.maquina)}</b><span class="live-dur">${stale?'⚠️ ':''}${fmtDur(dur)}</span></div>
+      <div>👤 ${escapeHtml(o.operador||'-')} · desde ${desde}${hi}</div>
+      ${onde ? `<div>📍 ${onde}</div>` : ''}${btn}
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="live-panel">
+    <div class="live-head"><b>🚜 Máquinas em operação${ops.length ? ' (' + ops.length + ')' : ''}</b><button class="live-refresh" onclick="refreshShared(true)" aria-label="Atualizar">↻</button></div>
+    <div class="live-meta">${meta}</div>
+    ${ops.length ? itens : '<div class="live-empty">Nenhuma máquina em operação agora.</div>'}
+  </div>`;
+}
+function encerrarPeloPainel(id){
+  const o = operacoesAbertas().find(x=>x.id === id);
+  if(!o) return;
+  if(!confirm(`Encerrar a operação de ${o.maquina} (${o.operador||'-'}), aberta há ${fmtDur(Date.now()-o.ts)}?\n\nUse só se o operador esqueceu de finalizar. Isso apenas tira a máquina da lista de "em operação"; não gera relatório no Teams/Planner.`)) return;
+  queueCancel(evCancelamento(id, o.maquina, 'encerrada pelo painel (esquecida)')).then(()=>{ toast('Operação encerrada no painel.'); refreshShared(true); });
+}
+// Horímetro "único": maior valor da máquina nos eventos compartilhados.
+function sharedMaxHorimetro(alvo){
+  let max = null;
+  sharedEvents.forEach(e=>{
+    if(!e || !e.maquina || normEquip(e.maquina) !== alvo) return;
+    [e.horimetroInicial, e.horimetroFinal].forEach(v=>{
+      const n = parseFloat(v);
+      if(!isNaN(n) && (max === null || n > max)) max = n;
+    });
+  });
+  return max;
+}
 
 /* ===================== Manutenção por horímetro ===================== */
 const MAINT_KEY = 'agrohama_manutencao_v1';
@@ -1031,6 +1245,18 @@ function normEquip(s){
   const m = t.match(/^([a-z]+)0*(\d{1,3})$/);
   return m ? m[1] + m[2] : t;
 }
+// Nome do trator como o fluxo de manutenção (lista do SharePoint) espera: "KH 63", "MT 01"...
+// O fluxo procura o item por título exato (só ignora maiúsculas), então "Kh63" ou "KH.63" não achavam
+// "kh 63" e o horímetro da lista deixava de atualizar. Usa o nome do cadastro mestre quando existe;
+// senão padroniza LETRAS + espaço + número (sem zeros à esquerda); placas ficam como digitadas.
+function nomeParaManutencao(t){
+  if(t === undefined || t === null) return t;
+  const known = findMasterEquip(t);
+  if(known) return known.codigo;
+  const s = String(t).trim();
+  const m = s.match(/^([A-Za-zÀ-ÿ]+)[\s\.\-]*0*(\d{1,3})$/);
+  return m ? m[1].toUpperCase() + ' ' + m[2] : s;
+}
 function findMasterEquip(codigo){
   if(!codigo) return null;
   const alvo = normEquip(codigo);
@@ -1078,6 +1304,8 @@ function getCurrentHorimetro(tratorNome){
       if(!isNaN(n) && (max === null || n > max)) max = n;
     });
   });
+  const sh = sharedMaxHorimetro(alvo);
+  if(sh !== null && (max === null || sh > max)) max = sh;
   return max;
 }
 
@@ -1455,6 +1683,7 @@ function render(){
   if(currentFilter === 'concluido') items = items.filter(r=>r.status === 'concluido');
 
   renderMaintBanner();
+  renderSharedPanel();
   updatePendingSyncButton();
 
   if(items.length === 0){
@@ -1528,6 +1757,20 @@ function saveStart(){
     toast('Preencha ao menos Fazenda, Operador e Trator.');
     return;
   }
+  // Máquina já em operação (neste ou em outro aparelho)? Avisa antes de abrir uma segunda operação.
+  const jaAbertas = operacoesAbertas().filter(o => normEquip(o.maquina) === normEquip(nomeParaManutencao(tractor)));
+  if(jaAbertas.length){
+    const o = jaAbertas[0];
+    if(!confirm(`⚠️ ${o.maquina} já consta EM OPERAÇÃO (${o.operador||'-'}, aberta há ${fmtDur(Date.now()-o.ts)}).\n\nOK = iniciar outra operação mesmo assim\nCancelar = voltar`)) return;
+  }
+  // Confere o horímetro inicial com o último conhecido deste trator (pega vírgula/ponto esquecido, ex.: 11198 em vez de 1119.8).
+  const hiNum = parseFloat(document.getElementById('f_horimetroInicial').value);
+  if(!isNaN(hiNum)){
+    const ult = getCurrentHorimetro(tractor);
+    if(ult !== null && (hiNum < ult - 1 || hiNum - ult > 100)){
+      if(!confirm(`Confira o horímetro inicial!\n\nVocê digitou ${hiNum}, mas o último registrado deste trator foi ${ult}.\n\nOK = está certo, continuar\nCancelar = voltar e corrigir`)) return;
+    }
+  }
   const rec = {
     id: uid(),
     formNumber: document.getElementById('f_formNumber').value.trim(),
@@ -1554,7 +1797,8 @@ function saveStart(){
     createdAt: Date.now(),
     updatedAt: Date.now(),
     synced: false,
-    launched: false
+    launched: false,
+    compart: true, evInicioSynced: false, evFimSynced: false
   };
   records.push(rec);
   debugLog('inicio_criado', {id: rec.id, trator: rec.tractor, operador: rec.operator, fazenda: rec.farm});
@@ -1563,6 +1807,7 @@ function saveStart(){
   render();
   if(saved) toast('Operação iniciada e salva neste aparelho.');
   attemptSync(rec, 'inicio');
+  sendEventos();
   checkMaintenanceAlerts();
 }
 
@@ -1658,6 +1903,16 @@ function saveFinish(){
   const r = records.find(x=>x.id===id);
   if(!r){ toast('Essa operação não foi encontrada neste aparelho. Nada foi salvo. Avise o suporte.', 9000); closeModal('modalFinish'); return; }
 
+  // Confere o horímetro final com o inicial (final menor, ou salto maior que 24 h de uso, quase sempre é digitação errada).
+  const hfNum = parseFloat(document.getElementById('fin_horimetroFinal').value);
+  const hiRec = parseFloat(r.horimetroInicial);
+  if(!isNaN(hfNum) && !isNaN(hiRec)){
+    if(hfNum < hiRec){
+      if(!confirm(`Confira o horímetro final!\n\nO final (${hfNum}) está MENOR que o inicial (${hiRec}).\n\nOK = salvar assim mesmo\nCancelar = voltar e corrigir`)) return;
+    } else if(hfNum - hiRec > 24){
+      if(!confirm(`Confira o horímetro final!\n\nO final (${hfNum}) está ${(hfNum - hiRec).toFixed(1)} h acima do inicial (${hiRec}). Uma operação não passa de 24 h.\n\nOK = salvar assim mesmo\nCancelar = voltar e corrigir`)) return;
+    }
+  }
   r.horaFinal = document.getElementById('fin_horaFinal').value;
   r.horimetroFinal = document.getElementById('fin_horimetroFinal').value;
   r.obs = document.getElementById('fin_obs').value.trim();
@@ -1665,12 +1920,14 @@ function saveFinish(){
   r.updatedAt = Date.now();
   r.synced = false;
   r.horimetroSynced = false;
+  r.compart = true; r.evFimSynced = false; r.dataFim = todayISO();
   const saved = saveRecords(records);
   closeModal('modalFinish');
   render();
   if(saved) toast('Operação finalizada e salva neste aparelho.');
   attemptSync(r, 'fechamento');
   syncHorimetroAtualizado(r);
+  sendEventos();
   checkMaintenanceAlerts();
 }
 
@@ -1796,6 +2053,8 @@ function resolveProblem(id){
 function deleteRecord(id){
   if(!confirm('Excluir este registro deste aparelho?')) return;
   debugLog('registro_excluido', {id});
+  const excl = records.find(r=>r.id===id);
+  if(excl && excl.compart && excl.status === 'andamento' && settings.evGravarUrl) queueCancel(evCancelamento('i_'+id, excl.tractor, 'excluída no aparelho'));
   records = records.filter(r=>r.id!==id);
   saveRecords(records);
   render();
@@ -2004,7 +2263,7 @@ function syncHorimetroAtualizado(record, force){
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       evento: 'horimetro_atualizado',
-      trator: record.tractor,
+      trator: nomeParaManutencao(record.tractor),
       horimetroFinal: record.horimetroFinal
     })
   }).then(resp=>{
@@ -2027,6 +2286,7 @@ function retryPendingSyncs(){
 }
 function retryPendingSyncsInner(){
   if(!navigator.onLine) return;
+  sendEventos(); sendCancels(); refreshShared();
   if(settings.webhookUrl && settings.autoSync){
     records.filter(r=>!r.synced).forEach(r=>{
       let evento = r.status === 'andamento' ? 'inicio' : 'fechamento';
@@ -2057,9 +2317,9 @@ function updatePendingSyncButton(){
   const row = document.getElementById('pendingSyncRow');
   const btn = document.getElementById('pendingSyncBtn');
   if(!row || !btn) return;
-  if(!settings.webhookUrl && !settings.webhookUrlManut){ row.style.display = 'none'; return; }
+  if(!settings.webhookUrl && !settings.webhookUrlManut && !settings.evGravarUrl){ row.style.display = 'none'; return; }
   const pendingRecords = settings.webhookUrl ? records.filter(r=>!r.synced).length : 0;
-  const total = pendingRecords + pendingMaintAlerts().length + pendingHorimetroSyncs().length;
+  const total = pendingRecords + pendingMaintAlerts().length + pendingHorimetroSyncs().length + eventosPendentes().length + (settings.evGravarUrl ? loadCancels().length : 0);
   if(total === 0){ row.style.display = 'none'; return; }
   row.style.display = 'flex';
   btn.textContent = `📤 Enviar pendências agora (${total})`;
@@ -2071,14 +2331,15 @@ function manualSendPending(){
   reconcileOutbox().then(()=>manualSendPendingInner());
 }
 function manualSendPendingInner(){
-  if(!settings.webhookUrl && !settings.webhookUrlManut){
+  if(!settings.webhookUrl && !settings.webhookUrlManut && !settings.evGravarUrl){
     toast('Configure uma URL de automação na aba Ajustes antes de enviar.');
     return;
   }
   const pendingRecords = settings.webhookUrl ? records.filter(r=>!r.synced) : [];
   const pendingMaint = pendingMaintAlerts();
   const pendingHorimetro = pendingHorimetroSyncs();
-  const total = pendingRecords.length + pendingMaint.length + pendingHorimetro.length;
+  const nEv = eventosPendentes().length + (settings.evGravarUrl ? loadCancels().length : 0);
+  const total = pendingRecords.length + pendingMaint.length + pendingHorimetro.length + nEv;
   if(total === 0){
     toast('Nada pendente para enviar agora.');
     return;
@@ -2098,7 +2359,9 @@ function manualSendPendingInner(){
   pendingHorimetro.forEach(r=>{
     promises.push(syncHorimetroAtualizado(r, true));
   });
+  promises.push(sendEventos(true), sendCancels(true));
   Promise.all(promises).then(results=>{
+    results = [].concat.apply([], results);
     const ok = results.filter(Boolean).length;
     render();
     renderMaintenance();
@@ -2231,6 +2494,8 @@ function switchTab(tab){
   if(tab==='settings'){
     document.getElementById('webhookUrl').value = settings.webhookUrl || '';
     document.getElementById('webhookUrlManut').value = settings.webhookUrlManut || '';
+    document.getElementById('evGravarUrl').value = settings.evGravarUrl || '';
+    document.getElementById('evListarUrl').value = settings.evListarUrl || '';
     document.getElementById('autoSyncToggle').checked = !!settings.autoSync;
     renderSecurityBlock();
   }
@@ -2245,6 +2510,8 @@ function switchTab(tab){
 function saveSettings(){
   settings.webhookUrl = document.getElementById('webhookUrl').value.trim();
   settings.webhookUrlManut = document.getElementById('webhookUrlManut').value.trim();
+  settings.evGravarUrl = document.getElementById('evGravarUrl').value.trim();
+  settings.evListarUrl = document.getElementById('evListarUrl').value.trim();
   settings.autoSync = document.getElementById('autoSyncToggle').checked;
   applyFixedSettings(settings);
   saveSettingsObj(settings);
@@ -2395,6 +2662,22 @@ function onTractorFieldChange(value){
   const field = document.getElementById('f_formNumber');
   const ref = resolveMachineRefForTractor(value);
   field.value = ref ? buildAutoFormNumber(ref) : '';
+  const hint = document.getElementById('f_horimetroHint');
+  if(hint){
+    hint.className = 'hint';
+    const v = String(value||'').trim();
+    if(!v){ hint.textContent = ''; }
+    else {
+      const aberta = operacoesAbertas().filter(o => normEquip(o.maquina) === normEquip(nomeParaManutencao(v)))[0];
+      const ult = getCurrentHorimetro(v);
+      if(aberta){
+        hint.className = 'hint hint-warn';
+        hint.textContent = `⚠️ ${aberta.maquina} já está em operação (${aberta.operador||'-'}, desde ${new Date(aberta.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}).`;
+      } else if(ult !== null){
+        hint.textContent = `Último horímetro conhecido desta máquina: ${ult}`;
+      } else hint.textContent = '';
+    }
+  }
 }
 
 /* ===================== Backup / restauração ===================== */
@@ -2554,6 +2837,11 @@ if(navigator.storage && navigator.storage.persist){
 }
 updateConnStatus();
 buildEquipDatalist();
+// v14: operações que já estavam em andamento antes da atualização passam a ser compartilhadas também.
+if(records.some(r => r && r.status === 'andamento' && r.compart === undefined)){
+  records.forEach(r => { if(r && r.status === 'andamento' && r.compart === undefined) r.compart = true; });
+  saveRecords(records);
+}
 render();
 checkMaintenanceAlerts();
 updatePendingSyncButton();
@@ -2575,13 +2863,22 @@ document.addEventListener('visibilitychange', () => {
 // confiável no campo; se não tiver sinal de verdade o fetch só falha e tenta de novo no próximo ciclo.
 setInterval(() => {
   if(document.visibilityState !== 'visible') return;
-  if(!settings.webhookUrl) return;
-  if(!records.some(r => r && !r.synced) && !pendingHorimetroSyncs().length) return;
+  const temEv = settings.evGravarUrl && (eventosPendentes().length || loadCancels().length);
+  if(!settings.webhookUrl && !temEv) return;
+  if(!records.some(r => r && !r.synced) && !pendingHorimetroSyncs().length && !temEv) return;
   reconcileOutbox().then(() => {
-    records.filter(r => r && !r.synced).forEach(r => attemptSync(r, eventoParaRegistro(r), true));
-    pendingHorimetroSyncs().forEach(r => syncHorimetroAtualizado(r, true));
+    if(settings.webhookUrl){
+      records.filter(r => r && !r.synced).forEach(r => attemptSync(r, eventoParaRegistro(r), true));
+      pendingHorimetroSyncs().forEach(r => syncHorimetroAtualizado(r, true));
+    }
+    if(temEv){ sendEventos(true); sendCancels(true); }
   });
 }, 45000);
+// Painel "Máquinas em operação": atualiza a cada 60 s enquanto o app está aberto e visível.
+setInterval(() => {
+  if(document.visibilityState === 'visible' && settings.evListarUrl) refreshShared();
+  else try{ renderSharedPanel(); }catch(e){}
+}, 60000);
 
 /* ===================== PWA: service worker (offline + atualização automática) =====================
    Assim que houver internet, o app busca sozinho a versão mais nova publicada no GitHub Pages,
