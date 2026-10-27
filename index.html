@@ -2227,26 +2227,38 @@ function attemptSync(record, eventType, force){
   if(record.synced) return null;
   if(syncInFlight.has(record.id)) return null;
   syncInFlight.add(record.id);
-  return fetch(settings.webhookUrl, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      evento: eventType,
-      texto: buildTeamsText(record),
-      registro: registroParaEnvio(record)
-    })
-  }).then(resp=>{
-    if(resp.ok){
-      record.synced = true;
-      saveRecords(records);
-      render();
-    }
-    return resp.ok;
-  }).then(ok=>{
+  // Trava entre o app e o service worker (envio em segundo plano): sem ela, quando o sinal volta os dois
+  // mandavam o MESMO registro quase ao mesmo tempo e o Planner criava dois cartões (caso KH31 de 27/10).
+  // Dentro da trava, primeiro absorve o que o outro lado já enviou e só então decide se ainda precisa enviar.
+  return withSendLock(()=> reconcileOutbox().then(()=>{
+    if(record.synced) return true; // o service worker já enviou: não manda de novo
+    return fetch(settings.webhookUrl, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        evento: eventType,
+        texto: buildTeamsText(record),
+        registro: registroParaEnvio(record)
+      })
+    }).then(resp=>{
+      if(resp.ok){
+        record.synced = true;
+        saveRecords(records);
+        render();
+      }
+      return outboxReady.then(()=>resp.ok); // espera a caixa de saída ser atualizada antes de soltar a trava
+    });
+  })).then(ok=>{
     if(!ok) armBackgroundSync(); // falhou (sem sinal de verdade?): o navegador tenta de novo sozinho quando a conexão voltar
     return ok;
   }).catch(()=>{ armBackgroundSync(); return false; })
   .finally(()=>{ syncInFlight.delete(record.id); });
+}
+function withSendLock(fn){
+  try{
+    if(navigator.locks && navigator.locks.request) return navigator.locks.request('agrohama-send', fn);
+  }catch(e){}
+  return fn();
 }
 // Best-effort: avisa o fluxo "Cadastro e Alerta de Manutencao" sempre que uma operação é finalizada,
 // pra atualizar o horímetro atual do trator no SharePoint (não importa o aparelho/operador) e disparar

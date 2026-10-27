@@ -6,7 +6,7 @@
    Ao publicar uma correção: basta subir os arquivos atualizados no GitHub Pages. Troque o número da
    versão abaixo (CACHE_VERSION) sempre que fizer uma alteração — isso garante que o cache antigo seja
    descartado e a versão nova seja usada em todos os aparelhos assim que eles tiverem internet. */
-const CACHE_VERSION = 'v15';
+const CACHE_VERSION = 'v16';
 const CACHE_NAME = `agrohama-checklist-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -118,7 +118,14 @@ async function flushOutbox() {
   if (falhou) throw new Error('outbox: ainda há itens pendentes');
 }
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'outbox-sync') event.waitUntil(flushOutbox());
+  // Mesma trava do app (Web Locks): impede que o app e o service worker enviem o mesmo item ao mesmo tempo.
+  if (event.tag === 'outbox-sync') {
+    event.waitUntil(
+      (self.navigator && self.navigator.locks && self.navigator.locks.request)
+        ? self.navigator.locks.request('agrohama-send', () => flushOutbox())
+        : flushOutbox()
+    );
+  }
 });
 
 self.addEventListener('fetch', (event) => {
