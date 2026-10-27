@@ -2255,7 +2255,7 @@ function attemptSync(record, eventType, force){
 // mais atual, então não fica desatualizado por muito tempo.
 function syncHorimetroAtualizado(record, force){
   if(!settings.webhookUrlManut) return null;
-  if(!record.tractor || record.horimetroFinal === '' || record.horimetroFinal === undefined || record.horimetroFinal === null) return null;
+  if(!record.tractor || record.horimetroFinal === '' || record.horimetroFinal === undefined || record.horimetroFinal === null || isNaN(parseFloat(record.horimetroFinal))) return null;
   if(record.horimetroSynced && !force) return null;
   if(!force && !navigator.onLine) return null;
   return fetch(settings.webhookUrlManut, {
@@ -2296,11 +2296,12 @@ function retryPendingSyncsInner(){
     });
   }
   if(settings.webhookUrlManut){
-    records.filter(r=>r.status==='concluido' && !r.horimetroSynced).forEach(r=>syncHorimetroAtualizado(r));
+    records.filter(horimetroEnviavel).forEach(r=>syncHorimetroAtualizado(r));
   }
 }
 
 function pendingMaintAlerts(){
+  if(!settings.webhookUrl) return []; // sem a URL do Teams/Planner o alerta não tem para onde ir
   return maintConfigs.filter(cfg=>{
     if(!cfg.alertSent) cfg.alertSent = {proximo:false, vencido:false};
     const info = computeMaintStatus(cfg);
@@ -2308,9 +2309,17 @@ function pendingMaintAlerts(){
   });
 }
 
+// Só é "pendente" o que dá pra enviar de verdade: registro concluído, com trator e com horímetro final
+// preenchido. Operação finalizada sem horímetro final nunca pode ser enviada ao fluxo de manutenção
+// e antes ficava contada como pendência para sempre (o botão "Enviar pendências" nunca zerava).
+function horimetroEnviavel(r){
+  return !!(r && r.status === 'concluido' && !r.horimetroSynced && r.tractor
+    && r.horimetroFinal !== '' && r.horimetroFinal !== undefined && r.horimetroFinal !== null
+    && !isNaN(parseFloat(r.horimetroFinal)));
+}
 function pendingHorimetroSyncs(){
   if(!settings.webhookUrlManut) return [];
-  return records.filter(r=>r.status==='concluido' && !r.horimetroSynced);
+  return records.filter(horimetroEnviavel);
 }
 
 function updatePendingSyncButton(){
@@ -2322,7 +2331,12 @@ function updatePendingSyncButton(){
   const total = pendingRecords + pendingMaintAlerts().length + pendingHorimetroSyncs().length + eventosPendentes().length + (settings.evGravarUrl ? loadCancels().length : 0);
   if(total === 0){ row.style.display = 'none'; return; }
   row.style.display = 'flex';
-  btn.textContent = `📤 Enviar pendências agora (${total})`;
+  const det = [];
+  if(pendingRecords) det.push(`${pendingRecords} operação(ões) p/ Teams/Planner`);
+  const nH = pendingHorimetroSyncs().length; if(nH) det.push(`${nH} horímetro(s)`);
+  const nM = pendingMaintAlerts().length; if(nM) det.push(`${nM} alerta(s) de manutenção`);
+  const nE = eventosPendentes().length + (settings.evGravarUrl ? loadCancels().length : 0); if(nE) det.push(`${nE} evento(s) do painel`);
+  btn.innerHTML = `📤 Enviar pendências agora (${total})<small style="display:block;font-weight:400;font-size:11px;margin-top:2px;">${det.join(' · ')}</small>`;
 }
 
 // Envio manual, forçado: tenta enviar mesmo que "envio automático" esteja desligado ou o
