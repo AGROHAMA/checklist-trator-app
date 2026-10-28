@@ -809,8 +809,7 @@ function mirrorOutbox(){
     }
     eventosPendentes().forEach(p=>{ wanted.push({key:p.key, url:settings.evGravarUrl, body:p.body}); });
     if(settings.webhookUrlManut){
-      records.filter(r=>r && r.id && r.status==='concluido' && !r.horimetroSynced && r.tractor
-        && r.horimetroFinal !== '' && r.horimetroFinal !== undefined && r.horimetroFinal !== null).forEach(r=>{
+      records.filter(horimetroEnviavel).forEach(r=>{
         wanted.push({key:'h:'+r.id, url:settings.webhookUrlManut,
           body: JSON.stringify({evento:'horimetro_atualizado', trator:nomeParaManutencao(r.tractor), horimetroFinal:r.horimetroFinal})});
       });
@@ -1152,11 +1151,33 @@ function encerrarPeloPainel(id){
   queueCancel(evCancelamento(id, o.maquina, 'encerrada pelo painel (esquecida)')).then(()=>{ toast('Operação encerrada no painel.'); refreshShared(true); });
 }
 // Horímetro "único": maior valor da máquina nos eventos compartilhados.
+// Horímetro final plausível: o motor não gira mais horas do que o relógio andou desde o início da operação
+// (nem mais de 24 h numa operação). Um valor fora disso (ex.: 17175.8 em vez de 14175.8) é erro de digitação
+// e NÃO pode virar o "horímetro atual" da máquina nem disparar alerta de manutenção.
+function usoPlausivel(hi, hf, startTs, endTs){
+  const a = parseFloat(hi), b = parseFloat(hf);
+  if(isNaN(a) || isNaN(b)) return true; // sem os dois valores não há como julgar
+  const d = b - a;
+  if(d < -1 || d > 24) return false;
+  if(startTs && endTs && endTs > startTs && d > (endTs - startTs)/3600000 + 1) return false;
+  return true;
+}
+function tsData(data, hora){
+  const t = new Date((data||'') + 'T' + (hora||'00:00') + ':00').getTime();
+  return isNaN(t) ? 0 : t;
+}
 function sharedMaxHorimetro(alvo){
   let max = null;
+  const inicios = {};
+  sharedEvents.forEach(e=>{ if(e && e.tipo === 'inicio' && e.id) inicios[e.id] = e; });
   sharedEvents.forEach(e=>{
     if(!e || !e.maquina || normEquip(e.maquina) !== alvo) return;
-    [e.horimetroInicial, e.horimetroFinal].forEach(v=>{
+    const vals = [e.horimetroInicial];
+    if(e.tipo === 'fim'){
+      const ini = inicios[e.refInicio];
+      if(!ini || usoPlausivel(ini.horimetroInicial, e.horimetroFinal, tsData(ini.data, ini.horaInicio), tsData(e.dataFim || ini.data, e.horaFinal))) vals.push(e.horimetroFinal);
+    } else vals.push(e.horimetroFinal);
+    vals.forEach(v=>{
       const n = parseFloat(v);
       if(!isNaN(n) && (max === null || n > max)) max = n;
     });
@@ -1299,7 +1320,9 @@ function getCurrentHorimetro(tratorNome){
   let max = null;
   records.forEach(r=>{
     if(!r.tractor || normEquip(r.tractor) !== alvo) return;
-    [r.horimetroFinal, r.horimetroInicial].forEach(v=>{
+    const vals = [r.horimetroInicial];
+    if(usoPlausivel(r.horimetroInicial, r.horimetroFinal, tsData(r.date, r.horaInicio), tsData(r.dataFim || r.date, r.horaFinal))) vals.push(r.horimetroFinal);
+    vals.forEach(v=>{
       const n = parseFloat(v);
       if(!isNaN(n) && (max === null || n > max)) max = n;
     });
@@ -1907,10 +1930,23 @@ function saveFinish(){
   const hfNum = parseFloat(document.getElementById('fin_horimetroFinal').value);
   const hiRec = parseFloat(r.horimetroInicial);
   if(!isNaN(hfNum) && !isNaN(hiRec)){
+    // TRAVA: o motor não gira mais horas do que o relógio andou. Se o horímetro final passa disso, está errado
+    // (dígito a mais/menos, ponto decimal) e o app não deixa salvar — esse valor estragava o aviso de manutenção.
+    const horaFinalDig = document.getElementById('fin_horaFinal').value;
+    let spanH = 0;
+    if(r.horaInicio && horaFinalDig){
+      const [h1,m1] = r.horaInicio.split(':').map(Number), [h2,m2] = horaFinalDig.split(':').map(Number);
+      let mins = (h2*60+m2) - (h1*60+m1); if(mins < 0) mins += 24*60; spanH = mins/60;
+    }
+    const decorridoH = Math.max((Date.now() - tsData(r.date, r.horaInicio))/3600000, spanH);
+    const usado = hfNum - hiRec;
+    if(usado > 24 || usado > decorridoH + 1){
+      const maxOk = hiRec + Math.min(24, decorridoH + 1);
+      alert(`Horímetro final IMPOSSÍVEL!\n\nVocê digitou ${hfNum}, o que daria ${usado.toFixed(1)} h de uso — mas a máquina só trabalhou cerca de ${decorridoH.toFixed(1)} h desde o início.\n\nO inicial foi ${hiRec}. O final deve estar entre ${hiRec} e ${maxOk.toFixed(1)}.\n\nOlhe de novo o painel da máquina (cuidado com dígito a mais/menos e com a vírgula) e digite o valor correto.`);
+      return;
+    }
     if(hfNum < hiRec){
       if(!confirm(`Confira o horímetro final!\n\nO final (${hfNum}) está MENOR que o inicial (${hiRec}).\n\nOK = salvar assim mesmo\nCancelar = voltar e corrigir`)) return;
-    } else if(hfNum - hiRec > 24){
-      if(!confirm(`Confira o horímetro final!\n\nO final (${hfNum}) está ${(hfNum - hiRec).toFixed(1)} h acima do inicial (${hiRec}). Uma operação não passa de 24 h.\n\nOK = salvar assim mesmo\nCancelar = voltar e corrigir`)) return;
     }
   }
   r.horaFinal = document.getElementById('fin_horaFinal').value;
@@ -2268,6 +2304,7 @@ function withSendLock(fn){
 function syncHorimetroAtualizado(record, force){
   if(!settings.webhookUrlManut) return null;
   if(!record.tractor || record.horimetroFinal === '' || record.horimetroFinal === undefined || record.horimetroFinal === null || isNaN(parseFloat(record.horimetroFinal))) return null;
+  if(!usoPlausivel(record.horimetroInicial, record.horimetroFinal, tsData(record.date, record.horaInicio), tsData(record.dataFim || record.date, record.horaFinal))) return null; // erro de digitação: não contamina a lista de manutenção
   if(record.horimetroSynced && !force) return null;
   if(!force && !navigator.onLine) return null;
   return fetch(settings.webhookUrlManut, {
@@ -2327,7 +2364,8 @@ function pendingMaintAlerts(){
 function horimetroEnviavel(r){
   return !!(r && r.status === 'concluido' && !r.horimetroSynced && r.tractor
     && r.horimetroFinal !== '' && r.horimetroFinal !== undefined && r.horimetroFinal !== null
-    && !isNaN(parseFloat(r.horimetroFinal)));
+    && !isNaN(parseFloat(r.horimetroFinal))
+    && usoPlausivel(r.horimetroInicial, r.horimetroFinal, tsData(r.date, r.horaInicio), tsData(r.dataFim || r.date, r.horaFinal)));
 }
 function pendingHorimetroSyncs(){
   if(!settings.webhookUrlManut) return [];
