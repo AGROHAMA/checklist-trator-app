@@ -1120,10 +1120,10 @@ function renderSharedPanel(){
   const agora = Date.now();
   let meta;
   if(evRefreshing) meta = 'atualizando…';
-  else if(!evCache.t) meta = evErro ? 'sem conexão — ainda não carregou' : 'carregando…';
+  else if(!evCache.t) meta = evErro ? 'não consegui carregar agora — toque em ↻ para tentar de novo' : 'carregando…';
   else {
     const hh = new Date(evCache.t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    meta = evErro ? `sem conexão — mostrando dados das ${hh}` : `atualizado às ${hh}`;
+    meta = evErro ? (navigator.onLine ? `não consegui atualizar agora (servidor ocupado) — mostrando dados das ${hh}` : `sem internet — mostrando dados das ${hh}`) : `atualizado às ${hh}`;
   }
   const itens = ops.map(o=>{
     const dur = agora - o.ts;
@@ -2938,11 +2938,12 @@ setInterval(() => {
     if(temEv){ sendEventos(true); sendCancels(true); }
   });
 }, 45000);
-// Painel "Máquinas em operação": atualiza a cada 60 s enquanto o app está aberto e visível.
+// Painel "Máquinas em operação": atualiza a cada 3 min enquanto o app está aberto e visível (cada atualização
+// faz o fluxo Listar ler todos os arquivos de eventos; muitos aparelhos a cada minuto sobrecarregavam o fluxo).
 setInterval(() => {
   if(document.visibilityState === 'visible' && settings.evListarUrl) refreshShared();
   else try{ renderSharedPanel(); }catch(e){}
-}, 60000);
+}, 180000);
 
 /* ===================== PWA: service worker (offline + atualização automática) =====================
    Assim que houver internet, o app busca sozinho a versão mais nova publicada no GitHub Pages,
