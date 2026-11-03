@@ -541,7 +541,7 @@
       <div class="row2">
         <div class="field">
           <label>Trator</label>
-          <input type="text" id="f_tractor" list="equipSuggestions" placeholder="ex: KH 97" oninput="onTractorFieldChange(this.value)">
+          <input type="text" id="f_tractor" list="equipSuggestions" placeholder="ex: KH 97" oninput="onTractorFieldChange(this.value)" onchange="(function(el){var k=findMasterEquip(el.value);if(k){el.value=k.codigo;onTractorFieldChange(el.value);}})(this)">
         </div>
         <div class="field">
           <label>Implementos</label>
@@ -758,7 +758,12 @@ function loadBackup(){
 // "KH94". O valor guardado no aparelho não muda (continua batendo com o cadastro de manutenção).
 function fmtFrota(t){
   if(t === undefined || t === null) return t;
-  return String(t).trim().toUpperCase().replace(/^([A-ZÀ-Ý]+)[\s\.\-]+(\d+)$/, '$1$2');
+  let s = String(t).trim().toUpperCase();
+  // "K H76", "K.H 76", "k h 76" -> código do cadastro mestre ("KH 76") antes de compactar
+  const known = findMasterEquip(s);
+  if(known) s = String(known.codigo).toUpperCase();
+  else if(/^[A-ZÀ-Ý][A-ZÀ-Ý\s]*[\s\.\-]*\d{1,3}$/.test(s)) s = s.replace(/[\s\.\-]+/g,'');
+  return s.replace(/^([A-ZÀ-Ý]+)[\s\.\-]+(\d+)$/, '$1$2');
 }
 function registroParaEnvio(r){
   return Object.assign({}, r, {tractor: fmtFrota(r.tractor)});
@@ -1274,7 +1279,9 @@ function nomeParaManutencao(t){
   if(t === undefined || t === null) return t;
   const known = findMasterEquip(t);
   if(known) return known.codigo;
-  const s = String(t).trim();
+  let s = String(t).trim();
+  const c = s.replace(/\s+/g,'');
+  if(/^[A-Za-zÀ-ÿ]+[\.\-]*0*\d{1,3}$/.test(c)) s = c;   // "K H76" -> "KH76"
   const m = s.match(/^([A-Za-zÀ-ÿ]+)[\s\.\-]*0*(\d{1,3})$/);
   return m ? m[1].toUpperCase() + ' ' + m[2] : s;
 }
