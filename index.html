@@ -736,7 +736,7 @@
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v22';
+const APP_VERSION = 'v23';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1191,23 +1191,29 @@ function tsData(data, hora){
   const t = new Date((data||'') + 'T' + (hora||'00:00') + ':00').getTime();
   return isNaN(t) ? 0 : t;
 }
-function sharedMaxHorimetro(alvo){
-  let max = null;
+function dataBR(iso){
+  const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}` : String(iso||'?');
+}
+// Todos os horímetros conhecidos da máquina nos eventos compartilhados, cada um com a origem.
+function sharedHorCands(alvo){
+  const out = [];
   const inicios = {};
   sharedEvents.forEach(e=>{ if(e && e.tipo === 'inicio' && e.id) inicios[e.id] = e; });
   sharedEvents.forEach(e=>{
     if(!e || !e.maquina || normEquip(e.maquina) !== alvo) return;
-    const vals = [e.horimetroInicial];
+    const add = (v, qual)=>{
+      const n = parseFloat(v);
+      if(!isNaN(n)) out.push({v:n, fonte:`operação de ${dataBR(e.data || (inicios[e.refInicio]||{}).data)} (${e.operador||(inicios[e.refInicio]||{}).operador||'-'}), horímetro ${qual}`});
+    };
+    if(e.tipo === 'manutencao') return;
+    add(e.horimetroInicial, 'inicial');
     if(e.tipo === 'fim'){
       const ini = inicios[e.refInicio];
-      if(!ini || usoPlausivel(ini.horimetroInicial, e.horimetroFinal, tsData(ini.data, ini.horaInicio), tsData(e.dataFim || ini.data, e.horaFinal))) vals.push(e.horimetroFinal);
-    } else vals.push(e.horimetroFinal);
-    vals.forEach(v=>{
-      const n = parseFloat(v);
-      if(!isNaN(n) && (max === null || n > max)) max = n;
-    });
+      if(!ini || usoPlausivel(ini.horimetroInicial, e.horimetroFinal, tsData(ini.data, ini.horaInicio), tsData(e.dataFim || ini.data, e.horaFinal))) add(e.horimetroFinal, 'final');
+    } else add(e.horimetroFinal, 'final');
   });
-  return max;
+  return out;
 }
 
 /* ===================== Manutenção por horímetro ===================== */
@@ -1340,27 +1346,45 @@ function saveMaint(list){
 }
 let maintConfigs = loadMaint();
 
-// Maior horímetro conhecido para um trator/máquina, a partir dos registros de operação já lançados.
-function getCurrentHorimetro(tratorNome, semPub){
-  if(!tratorNome) return null;
+// Salto máximo aceito entre o maior horímetro e o seguinte. Acima disso o valor mais alto é tratado como erro
+// de digitação (ex.: 36275 em vez de 14275) e NÃO vira o "horímetro atual" nem dispara aviso de manutenção.
+const HORIMETRO_SALTO_MAX = 300;
+function horimetroInfo(tratorNome, semPub){
+  const vazio = {atual:null, fonte:'', suspeitos:[]};
+  if(!tratorNome) return vazio;
   const alvo = normEquip(tratorNome);
-  let max = null;
+  const c = [];
   records.forEach(r=>{
     if(!r.tractor || normEquip(r.tractor) !== alvo) return;
-    const vals = [r.horimetroInicial];
-    if(usoPlausivel(r.horimetroInicial, r.horimetroFinal, tsData(r.date, r.horaInicio), tsData(r.dataFim || r.date, r.horaFinal))) vals.push(r.horimetroFinal);
-    vals.forEach(v=>{
-      const n = parseFloat(v);
-      if(!isNaN(n) && (max === null || n > max)) max = n;
-    });
+    const quem = `operação de ${dataBR(r.date)} (${r.operator||'-'}), horímetro`;
+    const ini = parseFloat(r.horimetroInicial);
+    if(!isNaN(ini)) c.push({v:ini, fonte:`${quem} inicial`});
+    if(usoPlausivel(r.horimetroInicial, r.horimetroFinal, tsData(r.date, r.horaInicio), tsData(r.dataFim || r.date, r.horaFinal))){
+      const fin = parseFloat(r.horimetroFinal);
+      if(!isNaN(fin)) c.push({v:fin, fonte:`${quem} final`});
+    }
   });
-  const sh = sharedMaxHorimetro(alvo);
-  if(sh !== null && (max === null || sh > max)) max = sh;
+  sharedHorCands(alvo).forEach(x=>c.push(x));
   if(!semPub){
     const ph = maintPubHorimetro(alvo);
-    if(ph !== null && (max === null || ph > max)) max = ph;
+    if(ph !== null) c.push({v:ph, fonte:'último horímetro publicado no cadastro compartilhado'});
   }
-  return max;
+  if(!c.length) return vazio;
+  c.sort((x,y)=>y.v-x.v);
+  const suspeitos = [];
+  // enquanto o valor mais alto estiver MUITO acima do próximo valor diferente, ele é suspeito
+  while(true){
+    const topo = c[0].v;
+    const prox = c.find(x=>x.v !== topo);
+    if(!prox || topo - prox.v <= HORIMETRO_SALTO_MAX) break;
+    suspeitos.push({v:topo, fonte:c[0].fonte});
+    for(let i=c.length-1;i>=0;i--) if(c[i].v === topo) c.splice(i,1);
+  }
+  return {atual:c[0].v, fonte:c[0].fonte, suspeitos};
+}
+// Maior horímetro conhecido (já sem valores suspeitos) para um trator/máquina.
+function getCurrentHorimetro(tratorNome, semPub){
+  return horimetroInfo(tratorNome, semPub).atual;
 }
 
 /* ===== Cadastro de manutenção COMPARTILHADO entre os aparelhos =====
@@ -1474,25 +1498,26 @@ function maintHousekeeping(){
     else {
       if(Date.now() - (pub.criadoEm||0) > MAINT_HEARTBEAT_MS) precisa = true;  // renovação mensal
       const real = getCurrentHorimetro(cfg.trator, true), ph = parseFloat(pub.horimetroAtual);
-      if(real !== null && (isNaN(ph) || real - ph >= MAINT_ATUAL_PASSO)) precisa = true;
+      if(real !== null && (isNaN(ph) || real - ph >= MAINT_ATUAL_PASSO || ph - real > HORIMETRO_SALTO_MAX)) precisa = true;
     }
     if(precisa) publishMaint(cfg, false);
   });
 }
 
 function computeMaintStatus(cfg){
-  const atual = getCurrentHorimetro(cfg.trator);
+  const hi = horimetroInfo(cfg.trator);
+  const atual = hi.atual;
   const intervalo = parseFloat(cfg.intervaloHoras);
   const ultimo = parseFloat(cfg.horimetroUltimaManutencao);
   if(atual === null || isNaN(intervalo) || isNaN(ultimo)){
-    return {status:'sem_dados', atual, limite:null, restante:null};
+    return {status:'sem_dados', atual, limite:null, restante:null, fonte:hi.fonte, suspeitos:hi.suspeitos};
   }
   const limite = ultimo + intervalo;
   const restante = limite - atual;
   let status = 'ok';
   if(restante <= 0) status = 'vencido';
   else if(restante <= 20) status = 'proximo';
-  return {status, atual, limite, restante};
+  return {status, atual, limite, restante, fonte:hi.fonte, suspeitos:hi.suspeitos};
 }
 
 // GPS: dias até o vencimento (negativo = já venceu). Avisa a partir de 30 dias.
@@ -1714,7 +1739,7 @@ function renderMaintenance(){
       ? `vencida há ${Math.abs(info.restante).toFixed(1)} h`
       : `faltam ${info.restante.toFixed(1)} h`);
     const manutencaoHtml = temManutencaoConfigurada
-      ? `Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : info.atual}</b><br>
+      ? `Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : info.atual}</b>${info.fonte ? `<br><span style="font-size:.85em;opacity:.75;">Fonte: ${escapeHtml(info.fonte)}</span>` : ''}${(info.suspeitos||[]).map(x=>`<br><span style="font-size:.9em;color:var(--amber-700);">⚠️ Valor ${x.v} ignorado (parece erro de digitação): ${escapeHtml(x.fonte)}. Corrija ou apague esse registro.</span>`).join('')}<br>
          Intervalo: <b>${escapeHtml(String(cfg.intervaloHoras))} h</b> · Última manutenção em: <b>${escapeHtml(String(cfg.horimetroUltimaManutencao))}</b><br>
          Próxima manutenção em: <b>${info.limite === null ? '—' : info.limite} (${restanteTxt})</b>`
       : `Manutenção por horímetro: <b>não configurada</b> nesse equipamento.`;
@@ -2035,7 +2060,8 @@ function saveStart(){
   if(!isNaN(hiNum)){
     const ult = getCurrentHorimetro(tractor);
     if(ult !== null && (hiNum < ult - 1 || hiNum - ult > 100)){
-      if(!confirm(`Confira o horímetro inicial!\n\nVocê digitou ${hiNum}, mas o último registrado deste trator foi ${ult}.\n\nOK = está certo, continuar\nCancelar = voltar e corrigir`)) return;
+      const forte = Math.abs(hiNum - ult) > HORIMETRO_SALTO_MAX ? '\n\n⚠️ A diferença é muito grande — provavelmente é erro de digitação.' : '';
+      if(!confirm(`Confira o horímetro inicial!\n\nVocê digitou ${hiNum}, mas o último registrado deste trator foi ${ult}.${forte}\n\nOK = está certo, continuar\nCancelar = voltar e corrigir`)) return;
     }
   }
   const rec = {
@@ -2989,7 +3015,8 @@ function onTractorFieldChange(value){
   const hintTrator = document.getElementById('f_tractorHint');
   const v = String(value||'').trim();
   const aberta = v ? operacoesAbertas().filter(o => normEquip(o.maquina) === normEquip(nomeParaManutencao(v)))[0] : null;
-  const ult = v ? getCurrentHorimetro(v) : null;
+  const hInfo = v ? horimetroInfo(v) : null;
+  const ult = hInfo ? hInfo.atual : null;
   if(hintTrator){
     hintTrator.textContent = aberta
       ? `⚠️ ${aberta.maquina} já está em operação (${aberta.operador||'-'}, desde ${new Date(aberta.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}).`
@@ -2997,7 +3024,7 @@ function onTractorFieldChange(value){
   }
   if(hint){
     hint.className = 'hint';
-    hint.textContent = (ult !== null) ? `Último horímetro conhecido desta máquina: ${ult}` : '';
+    hint.textContent = (ult !== null) ? `Último horímetro conhecido desta máquina: ${ult}` + ((hInfo.suspeitos||[]).length ? ` (valor ${hInfo.suspeitos[0].v} ignorado: parece erro)` : '') : '';
   }
 }
 
