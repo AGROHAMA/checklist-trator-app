@@ -388,7 +388,7 @@
       <summary>Como funciona (toque para abrir)</summary>
       <div>
         Cadastre aqui cada trator/máquina. Dois recursos, independentes — pode usar um, outro ou os dois:<br><br>
-        <b>Manutenção por horímetro:</b> informe o intervalo (de quantas em quantas horas precisa trocar óleo/filtro) e o horímetro da última manutenção. O app calcula o horímetro atual pelos registros já lançados e avisa aqui no app e no Planner/Teams: amarelo faltando 20h, vermelho quando já venceu. Depois de fazer a manutenção de verdade, toque em "Manutenção feita agora" no card pra zerar a contagem.<br><b>GPS:</b> nas máquinas com GPS, informe a data de vencimento da atualização. O app avisa 30 dias antes (amarelo) e fica vermelho quando vencer; depois de renovar, toque em "GPS atualizado" e informe a nova data.<br><b>Compartilhado:</b> com o envio configurado em Ajustes, o que você cadastra aqui aparece em todos os aparelhos (alterações levam até 3 minutos para chegar) e o aviso de cada máquina é enviado uma vez só.<br><br>
+        <b>Manutenção por horímetro:</b> cada máquina tem uma lista de itens, cada um com seu intervalo e o horímetro da última troca — por padrão: <b>Periódica</b> (óleo do motor + filtros de óleo e de combustível) a cada 300 h, <b>Filtro de ar</b> a cada 600 h e <b>Óleo hidráulico</b> a cada 800 h (dá pra ajustar, adicionar ou remover itens em cada máquina). O app calcula o horímetro atual pelos registros já lançados e avisa aqui no app e no Planner/Teams, item por item: amarelo quando está perto (20 h antes na periódica, 30 h no filtro de ar, 40 h no hidráulico), vermelho quando venceu. Depois de fazer a troca de verdade, toque em "Feita agora" no item certo pra zerar só a contagem dele.<br><b>GPS:</b> nas máquinas com GPS, informe a data de vencimento da atualização. O app avisa 30 dias antes (amarelo) e fica vermelho quando vencer; depois de renovar, toque em "GPS atualizado" e informe a nova data.<br><b>Compartilhado:</b> com o envio configurado em Ajustes, o que você cadastra aqui aparece em todos os aparelhos (alterações levam até 3 minutos para chegar) e o aviso de cada máquina é enviado uma vez só.<br><br>
         <b>Numeração do talão:</b> o número é do trator (não do operador), no formato <b>número da máquina + dia + mês + ano (2 dígitos) + hora + minuto</b>, sem nenhuma pontuação — ex: 972408260732 (trator 97, dia 24/08/26, às 07:32). É 100% automático: aparece sozinho ao selecionar o Trator na tela de Iniciar Operação, não dá pra editar à mão, e não precisa de internet nem de sincronizar entre aparelhos. Com o ano entrando (mesmo que só com 2 dígitos), a chance de dois talões do mesmo trator baterem o número é praticamente nula — só se repetiria em anos que terminam nos mesmos 2 dígitos (ex: 2026 e 2126). Informe o "Número de referência" da máquina (3 dígitos) uma única vez aqui — já vem sugerido pra tratores KH e veículos já conhecidos — e o app cuida do resto sozinho.
       </div>
     </details>
@@ -401,17 +401,13 @@
         <input type="text" id="maint_trator" list="equipSuggestions" placeholder="ex: KH 97" oninput="onMaintTractorInput(this.value)">
         <div class="hint">Use o mesmo código que você digita no campo "Trator" ao iniciar uma operação.</div>
       </div>
-      <div class="field" style="margin-top:2px;"><b style="font-size:12.5px;color:var(--gray-700);">Manutenção por horímetro (opcional)</b></div>
-      <div class="row2">
-        <div class="field">
-          <label>Intervalo de manutenção (horas)</label>
-          <input type="text" inputmode="decimal" id="maint_intervalo" placeholder="ex: 250" oninput="sanitizeDecimalInput(this)">
-        </div>
-        <div class="field">
-          <label>Horímetro na última manutenção</label>
-          <input type="text" inputmode="decimal" id="maint_ultimoHorimetro" placeholder="ex: 1200" oninput="sanitizeDecimalInput(this)">
-        </div>
+      <div class="field" style="margin-top:2px;"><b style="font-size:12.5px;color:var(--gray-700);">Itens de manutenção por horímetro (opcional)</b></div>
+      <div id="maint_itens"></div>
+      <div class="actions-row" style="margin-bottom:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="addMaintItemRow()">+ Adicionar item</button>
+        <button class="btn btn-ghost btn-sm" onclick="fillMaintPadrao()">Completar com o padrão (300 / 600 / 800 h)</button>
       </div>
+      <div class="hint" style="margin-bottom:8px;">Cada item conta separado: informe de quantas em quantas horas troca e o horímetro da última troca. Remova os itens que a máquina não tem.</div>
       <div class="field" style="margin-top:2px;"><b style="font-size:12.5px;color:var(--gray-700);">Atualização do GPS (opcional)</b></div>
       <div class="field">
         <label>Vencimento da atualização do GPS</label>
@@ -736,7 +732,7 @@
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v23';
+const APP_VERSION = 'v24';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1346,6 +1342,46 @@ function saveMaint(list){
 }
 let maintConfigs = loadMaint();
 
+/* ===== Itens de manutenção por máquina (v24) =====
+   Cada máquina tem uma lista de itens, cada um com intervalo e horímetro da última troca:
+   ex.: Periódica (óleo e filtros do motor + filtros de combustível) a cada 300 h, Filtro de ar a cada 600 h,
+   Óleo hidráulico a cada 800 h. Cada item conta separado e tem seu próprio aviso. */
+const MAINT_PADRAO = [
+  {id:'it_periodica', nome:'Periódica (óleo e filtros do motor + filtros de combustível)', intervaloHoras:'300'},
+  {id:'it_filtroar',  nome:'Filtro de ar do motor', intervaloHoras:'600'},
+  {id:'it_hidraulico',nome:'Óleo hidráulico', intervaloHoras:'800'}
+];
+function itemUid(){ return 'it_' + Math.random().toString(36).slice(2,8); }
+function novoAlertSent(){ return {proximo:false, vencido:false}; }
+// Converte o formato antigo (um único intervalo por máquina) para a lista de itens.
+function itensDeLegado(intervalo, ultima, alertSent){
+  const iv = parseFloat(intervalo);
+  if(isNaN(iv)) return [];
+  return [{id:'it_periodica', nome:MAINT_PADRAO[0].nome, intervaloHoras:String(intervalo),
+    horimetroUltima:(ultima===undefined||ultima===null)?'':String(ultima),
+    alertSent:{proximo:!!(alertSent&&alertSent.proximo), vencido:!!(alertSent&&alertSent.vencido)}}];
+}
+function maintItens(cfg){
+  if(!Array.isArray(cfg.itens)) cfg.itens = itensDeLegado(cfg.intervaloHoras, cfg.horimetroUltimaManutencao, cfg.alertSent);
+  cfg.itens.forEach(it=>{
+    if(!it.id) it.id = itemUid();
+    if(!it.alertSent) it.alertSent = novoAlertSent();
+  });
+  return cfg.itens;
+}
+function itensDoRegistro(e){
+  if(Array.isArray(e.itens)) return e.itens.map(it=>({id:it.id||itemUid(), nome:it.nome||'Item', intervaloHoras:String(it.intervaloHoras===undefined?'':it.intervaloHoras),
+    horimetroUltima:(it.horimetroUltima===undefined||it.horimetroUltima===null)?'':String(it.horimetroUltima),
+    alertSent:{proximo:!!(it.alertSent&&it.alertSent.proximo), vencido:!!(it.alertSent&&it.alertSent.vencido)}}));
+  return itensDeLegado(e.intervaloHoras, e.horimetroUltimaManutencao, e.alertSent);
+}
+// Mantém os campos antigos espelhando o 1º item (aparelhos/fluxos que ainda não conhecem a lista de itens).
+function maintSyncLegacy(cfg){
+  const it = (cfg.itens||[])[0];
+  cfg.intervaloHoras = it ? it.intervaloHoras : '';
+  cfg.horimetroUltimaManutencao = it ? it.horimetroUltima : '';
+}
+
 // Salto máximo aceito entre o maior horímetro e o seguinte. Acima disso o valor mais alto é tratado como erro
 // de digitação (ex.: 36275 em vez de 14275) e NÃO vira o "horímetro atual" nem dispara aviso de manutenção.
 const HORIMETRO_SALTO_MAX = 300;
@@ -1421,6 +1457,7 @@ function maintRegistro(cfg, removido){
     tipo: 'manutencao',
     maquina: nomeParaManutencao(cfg.trator),
     intervaloHoras: cfg.intervaloHoras, horimetroUltimaManutencao: cfg.horimetroUltimaManutencao,
+    itens: maintItens(cfg).map(it=>({id:it.id, nome:it.nome, intervaloHoras:it.intervaloHoras, horimetroUltima:it.horimetroUltima, alertSent:it.alertSent})),
     machineRef: cfg.machineRef || null,
     gpsVencimento: cfg.gpsVencimento || '',
     horimetroAtual: real !== null ? real : prev,
@@ -1474,7 +1511,7 @@ function mergeSharedMaint(){
       if(cfg && ts > (cfg.updatedAt||0)){ maintConfigs = maintConfigs.filter(c=>c!==cfg); mudou = true; }
       return;
     }
-    const campos = {trator:e.maquina, intervaloHoras:e.intervaloHoras, horimetroUltimaManutencao:e.horimetroUltimaManutencao,
+    const campos = {trator:e.maquina, itens:itensDoRegistro(e), intervaloHoras:e.intervaloHoras, horimetroUltimaManutencao:e.horimetroUltimaManutencao,
       machineRef:e.machineRef || null, gpsVencimento:e.gpsVencimento || '', alertSent:{proximo:!!(e.alertSent&&e.alertSent.proximo), vencido:!!(e.alertSent&&e.alertSent.vencido)}, updatedAt:ts};
     if(!cfg){ maintConfigs.push(Object.assign({id:uid(), createdAt:ts}, campos)); mudou = true; }
     else if(ts > (cfg.updatedAt||0)){ Object.assign(cfg, campos); mudou = true; }
@@ -1504,20 +1541,26 @@ function maintHousekeeping(){
   });
 }
 
+function computeItemStatus(it, atual){
+  const intervalo = parseFloat(it.intervaloHoras), ultimo = parseFloat(it.horimetroUltima);
+  if(atual === null || isNaN(intervalo) || isNaN(ultimo)) return {status:'sem_dados', limite:null, restante:null};
+  const limite = ultimo + intervalo, restante = limite - atual;
+  const aviso = Math.max(20, intervalo * 0.05); // 300 h -> 20 h; 600 h -> 30 h; 800 h -> 40 h
+  let status = 'ok';
+  if(restante <= 0) status = 'vencido';
+  else if(restante <= aviso) status = 'proximo';
+  return {status, limite, restante};
+}
 function computeMaintStatus(cfg){
   const hi = horimetroInfo(cfg.trator);
   const atual = hi.atual;
-  const intervalo = parseFloat(cfg.intervaloHoras);
-  const ultimo = parseFloat(cfg.horimetroUltimaManutencao);
-  if(atual === null || isNaN(intervalo) || isNaN(ultimo)){
-    return {status:'sem_dados', atual, limite:null, restante:null, fonte:hi.fonte, suspeitos:hi.suspeitos};
-  }
-  const limite = ultimo + intervalo;
-  const restante = limite - atual;
-  let status = 'ok';
-  if(restante <= 0) status = 'vencido';
-  else if(restante <= 20) status = 'proximo';
-  return {status, atual, limite, restante, fonte:hi.fonte, suspeitos:hi.suspeitos};
+  const itens = maintItens(cfg).map(it => Object.assign({item:it}, computeItemStatus(it, atual)));
+  const peso = {vencido:0, proximo:1, ok:2};
+  const comDados = itens.filter(x => x.status !== 'sem_dados');
+  let pior = null;
+  comDados.forEach(x=>{ if(!pior || peso[x.status] < peso[pior.status] || (peso[x.status] === peso[pior.status] && x.restante < pior.restante)) pior = x; });
+  return {status: pior ? pior.status : 'sem_dados', atual, limite: pior ? pior.limite : null, restante: pior ? pior.restante : null,
+          fonte: hi.fonte, suspeitos: hi.suspeitos, itens};
 }
 
 // GPS: dias até o vencimento (negativo = já venceu). Avisa a partir de 30 dias.
@@ -1606,11 +1649,45 @@ function buildAutoFormNumber(machineRef){
   return `${refNum}${dd}${mm}${yy}${hh}${mi}`;
 }
 
+function maintItemRowHtml(it){
+  return `<div class="maint-item-row" data-id="${escapeHtml(it.id||'')}" style="border:1px solid var(--gray-200,#ddd);border-radius:10px;padding:8px;margin-bottom:8px;">
+    <input type="text" class="mi-nome" placeholder="ex: Filtro de ar do motor" value="${escapeHtml(it.nome||'')}">
+    <div class="row2">
+      <div class="field"><label>Intervalo (horas)</label><input type="text" inputmode="decimal" class="mi-iv" placeholder="ex: 600" value="${escapeHtml(String(it.intervaloHoras===undefined?'':it.intervaloHoras))}" oninput="sanitizeDecimalInput(this)"></div>
+      <div class="field"><label>Horímetro da última troca</label><input type="text" inputmode="decimal" class="mi-ult" placeholder="ex: 1200" value="${escapeHtml(String(it.horimetroUltima===undefined||it.horimetroUltima===null?'':it.horimetroUltima))}" oninput="sanitizeDecimalInput(this)"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="this.closest('.maint-item-row').remove()">Remover item</button>
+  </div>`;
+}
+function renderMaintItemRows(itens){
+  const el = document.getElementById('maint_itens');
+  if(el) el.innerHTML = itens.map(maintItemRowHtml).join('');
+}
+function lerMaintItemRows(){
+  return Array.from(document.querySelectorAll('#maint_itens .maint-item-row')).map(row=>({
+    id: row.dataset.id || '',
+    nome: row.querySelector('.mi-nome').value.trim(),
+    intervaloHoras: row.querySelector('.mi-iv').value.trim(),
+    horimetroUltima: row.querySelector('.mi-ult').value.trim()
+  }));
+}
+function addMaintItemRow(){
+  const el = document.getElementById('maint_itens');
+  if(!el) return;
+  el.insertAdjacentHTML('beforeend', maintItemRowHtml({id:itemUid(), nome:'', intervaloHoras:'', horimetroUltima:''}));
+}
+// Acrescenta os itens do padrão que ainda não estão na lista (não mexe nos que já existem).
+function fillMaintPadrao(){
+  const atuais = lerMaintItemRows();
+  const tem = id => atuais.some(x => x.id === id);
+  MAINT_PADRAO.forEach(p=>{ if(!tem(p.id)) atuais.push({id:p.id, nome:p.nome, intervaloHoras:p.intervaloHoras, horimetroUltima:''}); });
+  renderMaintItemRows(atuais);
+}
+
 function resetMaintForm(){
   document.getElementById('maint_editId').value = '';
   document.getElementById('maint_trator').value = '';
-  document.getElementById('maint_intervalo').value = '';
-  document.getElementById('maint_ultimoHorimetro').value = '';
+  renderMaintItemRows(MAINT_PADRAO.map(p=>({id:p.id, nome:p.nome, intervaloHoras:p.intervaloHoras, horimetroUltima:''})));
   document.getElementById('maint_machineRef').value = '';
   document.getElementById('maint_gpsVenc').value = '';
   document.getElementById('maintFormTitle').textContent = 'Cadastrar equipamento';
@@ -1633,8 +1710,7 @@ function editMaintConfig(id){
   if(!cfg) return;
   document.getElementById('maint_editId').value = cfg.id;
   document.getElementById('maint_trator').value = cfg.trator;
-  document.getElementById('maint_intervalo').value = cfg.intervaloHoras || '';
-  document.getElementById('maint_ultimoHorimetro').value = cfg.horimetroUltimaManutencao || '';
+  renderMaintItemRows(maintItens(cfg));
   document.getElementById('maint_machineRef').value = cfg.machineRef || '';
   document.getElementById('maint_gpsVenc').value = cfg.gpsVencimento || '';
   document.getElementById('maintFormTitle').textContent = 'Editar equipamento';
@@ -1644,8 +1720,6 @@ function editMaintConfig(id){
 
 function saveMaintConfig(){
   const trator = document.getElementById('maint_trator').value.trim();
-  const intervaloHoras = document.getElementById('maint_intervalo').value;
-  const horimetroUltimaManutencao = document.getElementById('maint_ultimoHorimetro').value;
   const machineRefRaw = document.getElementById('maint_machineRef').value.trim();
   const gpsVencimento = document.getElementById('maint_gpsVenc').value || '';
   if(!trator){
@@ -1662,26 +1736,37 @@ function saveMaintConfig(){
     return;
   }
   const editId = document.getElementById('maint_editId').value;
-  if(editId){
-    const cfg = maintConfigs.find(c=>c.id===editId);
-    if(cfg){
-      cfg.trator = trator;
-      cfg.intervaloHoras = intervaloHoras;
-      cfg.horimetroUltimaManutencao = horimetroUltimaManutencao;
-      cfg.machineRef = machineRef;
-      cfg.gpsVencimento = gpsVencimento;
-      cfg.alertSent = {proximo:false, vencido:false};
-      cfg.updatedAt = Date.now();
-    }
+  const cfgAntigo = editId ? maintConfigs.find(c=>c.id===editId) : null;
+  const antigos = cfgAntigo ? maintItens(cfgAntigo) : [];
+  const itens = [];
+  lerMaintItemRows().forEach(r=>{
+    if(!r.intervaloHoras || isNaN(parseFloat(r.intervaloHoras))) return; // sem intervalo não há o que controlar
+    const id = r.id || itemUid();
+    const velho = antigos.find(x=>x.id===id);
+    const igual = velho && String(velho.intervaloHoras) === r.intervaloHoras && String(velho.horimetroUltima||'') === r.horimetroUltima;
+    itens.push({id, nome:r.nome || 'Manutenção', intervaloHoras:r.intervaloHoras, horimetroUltima:r.horimetroUltima,
+      alertSent: igual ? velho.alertSent : novoAlertSent()});
+  });
+  if(cfgAntigo){
+    const cfg = cfgAntigo;
+    cfg.trator = trator;
+    cfg.itens = itens;
+    maintSyncLegacy(cfg);
+    cfg.machineRef = machineRef;
+    cfg.gpsVencimento = gpsVencimento;
+    cfg.alertSent = novoAlertSent();
+    cfg.updatedAt = Date.now();
   } else {
-    maintConfigs.push({
+    const cfg = {
       id: uid(),
-      trator, intervaloHoras, horimetroUltimaManutencao,
+      trator, itens,
       machineRef, gpsVencimento,
-      alertSent: {proximo:false, vencido:false},
+      alertSent: novoAlertSent(),
       createdAt: Date.now(),
       updatedAt: Date.now()
-    });
+    };
+    maintSyncLegacy(cfg);
+    maintConfigs.push(cfg);
   }
   saveMaint(maintConfigs);
   publishMaint(findMaintConfig(trator), false);
@@ -1702,23 +1787,27 @@ function deleteMaintConfig(id){
   render();
 }
 
-function markMaintDone(id){
+function markMaintDone(id, itemId){
   const cfg = maintConfigs.find(c=>c.id===id);
   if(!cfg) return;
+  const it = maintItens(cfg).find(x=>x.id===itemId);
+  if(!it) return;
   const atual = getCurrentHorimetro(cfg.trator);
   if(atual === null){
     toast('Ainda não há registro de horímetro para este trator — informe o valor manualmente ao editar.');
     return;
   }
-  if(!confirm(`Confirmar manutenção feita agora, com horímetro ${atual}?`)) return;
-  cfg.horimetroUltimaManutencao = atual;
-  cfg.alertSent = {proximo:false, vencido:false};
+  if(!confirm(`Confirmar "${it.nome}" feita agora, com horímetro ${atual}?`)) return;
+  it.horimetroUltima = String(atual);
+  it.alertSent = novoAlertSent();
+  maintSyncLegacy(cfg);
   cfg.updatedAt = Date.now();
   saveMaint(maintConfigs);
   publishMaint(cfg, false);
   renderMaintenance();
+  renderMaintBanner();
   render();
-  toast('Manutenção registrada. Contagem zerada.');
+  toast(`${it.nome}: contagem zerada.`);
 }
 
 function renderMaintenance(){
@@ -1734,14 +1823,20 @@ function renderMaintenance(){
   const ordered = [...maintConfigs].sort((a,b)=> peso[stCard(a)] - peso[stCard(b)]);
   list.innerHTML = ordered.map(cfg=>{
     const info = computeMaintStatus(cfg);
-    const temManutencaoConfigurada = cfg.intervaloHoras !== '' && cfg.intervaloHoras !== undefined && cfg.intervaloHoras !== null;
-    const restanteTxt = info.restante === null ? '—' : (info.restante <= 0
-      ? `vencida há ${Math.abs(info.restante).toFixed(1)} h`
-      : `faltam ${info.restante.toFixed(1)} h`);
+    const emoji = {ok:'🟢', proximo:'🟡', vencido:'🔴', sem_dados:'⚪'};
+    const temManutencaoConfigurada = info.itens.length > 0;
+    const itensHtml = info.itens.map(x=>{
+      const rt = x.restante === null ? 'sem horímetro da última troca' : (x.restante <= 0
+        ? `vencida há ${Math.abs(x.restante).toFixed(1)} h`
+        : `faltam ${x.restante.toFixed(1)} h`);
+      return `<div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--gray-200,#ddd);">
+        ${emoji[x.status]} <b>${escapeHtml(x.item.nome)}</b><br>
+        <span style="font-size:.92em;">A cada <b>${escapeHtml(String(x.item.intervaloHoras))} h</b> · última em <b>${escapeHtml(String(x.item.horimetroUltima||'—'))}</b> · próxima em <b>${x.limite === null ? '—' : x.limite}</b> (${rt})</span><br>
+        <button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="markMaintDone('${cfg.id}','${x.item.id}')">Feita agora</button>
+      </div>`;
+    }).join('');
     const manutencaoHtml = temManutencaoConfigurada
-      ? `Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : info.atual}</b>${info.fonte ? `<br><span style="font-size:.85em;opacity:.75;">Fonte: ${escapeHtml(info.fonte)}</span>` : ''}${(info.suspeitos||[]).map(x=>`<br><span style="font-size:.9em;color:var(--amber-700);">⚠️ Valor ${x.v} ignorado (parece erro de digitação): ${escapeHtml(x.fonte)}. Corrija ou apague esse registro.</span>`).join('')}<br>
-         Intervalo: <b>${escapeHtml(String(cfg.intervaloHoras))} h</b> · Última manutenção em: <b>${escapeHtml(String(cfg.horimetroUltimaManutencao))}</b><br>
-         Próxima manutenção em: <b>${info.limite === null ? '—' : info.limite} (${restanteTxt})</b>`
+      ? `Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : info.atual}</b>${info.fonte ? `<br><span style="font-size:.85em;opacity:.75;">Fonte: ${escapeHtml(info.fonte)}</span>` : ''}${(info.suspeitos||[]).map(x=>`<br><span style="font-size:.9em;color:var(--amber-700);">⚠️ Valor ${x.v} ignorado (parece erro de digitação): ${escapeHtml(x.fonte)}. Corrija ou apague esse registro.</span>`).join('')}${itensHtml}`
       : `Manutenção por horímetro: <b>não configurada</b> nesse equipamento.`;
     const gps = computeGpsStatus(cfg);
     const gpsHtml = gps ? `<br>📡 GPS: <b style="color:${gps.status==='vencido'?'var(--red-500,#c0392b)':(gps.status==='proximo'?'var(--amber-700)':'inherit')}">${gpsTexto(gps)}</b>` : '';
@@ -1761,7 +1856,6 @@ function renderMaintenance(){
       </div>
       <div class="maint-card-actions">
         <button class="btn btn-secondary btn-sm" onclick="editMaintConfig('${cfg.id}')">Editar</button>
-        ${temManutencaoConfigurada ? `<button class="btn btn-primary btn-sm" onclick="markMaintDone('${cfg.id}')">Manutenção feita agora</button>` : ''}
         ${gps ? `<button class="btn btn-secondary btn-sm" onclick="renovarGps('${cfg.id}')">GPS atualizado</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="deleteMaintConfig('${cfg.id}')">Remover</button>
       </div>
@@ -1772,14 +1866,15 @@ function renderMaintenance(){
 function renderMaintBanner(){
   const el = document.getElementById('maintBanner');
   if(!el) return;
-  const alerts = maintConfigs.map(cfg=>({cfg, info: computeMaintStatus(cfg)}))
-    .filter(x => x.info.status === 'proximo' || x.info.status === 'vencido')
-    .map(x => ({
-      cls: x.info.status === 'vencido' ? 'is-vencido' : 'is-proximo',
-      urgente: x.info.status === 'vencido',
-      html: `<b>🔧 ${x.info.status==='vencido' ? 'Manutenção vencida' : 'Manutenção se aproximando'} — ${escapeHtml(x.cfg.trator)}</b>${x.info.status === 'vencido' ? `vencida há ${Math.abs(x.info.restante).toFixed(1)} h` : `faltam ${x.info.restante.toFixed(1)} h`}`
-    }))
-    ;
+  const alerts = [];
+  maintConfigs.forEach(cfg=>{
+    computeMaintStatus(cfg).itens.forEach(x=>{
+      if(x.status !== 'proximo' && x.status !== 'vencido') return;
+      const venc = x.status === 'vencido';
+      alerts.push({cls: venc ? 'is-vencido' : 'is-proximo', urgente: venc,
+        html: `<b>🔧 ${escapeHtml(x.item.nome)} ${venc ? 'vencida' : 'se aproximando'} — ${escapeHtml(cfg.trator)}</b>${venc ? `vencida há ${Math.abs(x.restante).toFixed(1)} h` : `faltam ${x.restante.toFixed(1)} h`}`});
+    });
+  });
   maintConfigs.forEach(cfg=>{
     const g = computeGpsStatus(cfg);
     if(g && (g.status === 'proximo' || g.status === 'vencido')){
@@ -1796,17 +1891,17 @@ function renderMaintBanner(){
 
 /* Envia o alerta de manutenção (Planner/Teams) uma vez por cruzamento de limite, e reenvia se falhar por falta de conexão.
    force=true ignora o toggle de envio automático e o navigator.onLine (usado pelo botão manual). */
-function attemptSyncMaintenance(cfg, info, force){
+function attemptSyncMaintenance(cfg, it, st, atual, force){
   if(!settings.webhookUrl) return null;
   if(!force){
     if(!settings.autoSync) return null;
     if(!navigator.onLine) return null;
   }
-  const vencido = info.status === 'vencido';
-  const texto = `🔧 *Manutenção ${vencido ? 'VENCIDA' : 'se aproximando'} — ${cfg.trator}*\n`
-    + `Horímetro atual: ${info.atual}\n`
-    + `Próxima manutenção prevista em: ${info.limite}\n`
-    + (vencido ? `Já passou ${Math.abs(info.restante).toFixed(1)} h do previsto.` : `Faltam aproximadamente ${info.restante.toFixed(1)} h.`);
+  const vencido = st.status === 'vencido';
+  const texto = `🔧 *${it.nome} ${vencido ? 'VENCIDA' : 'se aproximando'} — ${cfg.trator}*\n`
+    + `Horímetro atual: ${atual}\n`
+    + `Próxima troca prevista em: ${st.limite}\n`
+    + (vencido ? `Já passou ${Math.abs(st.restante).toFixed(1)} h do previsto.` : `Faltam aproximadamente ${st.restante.toFixed(1)} h.`);
   return fetch(settings.webhookUrl, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -1816,15 +1911,16 @@ function attemptSyncMaintenance(cfg, info, force){
       texto,
       registro: {
         trator: cfg.trator,
-        horimetroAtual: info.atual,
-        horimetroLimite: info.limite,
-        horasRestantes: info.restante
+        item: it.nome,
+        horimetroAtual: atual,
+        horimetroLimite: st.limite,
+        horasRestantes: st.restante
       }
     })
   }).then(resp=>{
     if(resp.ok){
-      cfg.alertSent[vencido ? 'vencido' : 'proximo'] = true;
-      if(vencido) cfg.alertSent.proximo = true;
+      it.alertSent[vencido ? 'vencido' : 'proximo'] = true;
+      if(vencido) it.alertSent.proximo = true;
       saveMaint(maintConfigs);
       publishMaint(cfg, false);
       // Sem isso, o contador de "pendências" no topo da tela fica desatualizado até a próxima
@@ -1841,24 +1937,20 @@ function checkMaintenanceAlerts(){
   // assim um aparelho com dados velhos não repete um aviso que outro já mandou.
   const dadosFrescos = !settings.evListarUrl || (evCache.t && !evErro && Date.now() - evCache.t < 10*60000);
   maintConfigs.forEach(cfg=>{
-    if(!cfg.alertSent) cfg.alertSent = {proximo:false, vencido:false};
     const info = computeMaintStatus(cfg);
-    if(info.status === 'sem_dados'){
-      /* sem horímetro conhecido NESTE aparelho: não zera as marcas de aviso (antes zerava e o aviso saía de novo) */
-    } else if(info.status === 'ok'){
-      if(cfg.alertSent.proximo || cfg.alertSent.vencido){
-        cfg.alertSent = {proximo:false, vencido:false};
-        saveMaint(maintConfigs);
-        publishMaint(cfg, false);
+    let resetou = false;
+    info.itens.forEach(x=>{
+      const it = x.item;
+      if(x.status === 'sem_dados'){
+        /* sem horímetro conhecido NESTE aparelho: não zera as marcas de aviso */
+      } else if(x.status === 'ok'){
+        if(it.alertSent.proximo || it.alertSent.vencido){ it.alertSent = novoAlertSent(); resetou = true; }
+      } else if(dadosFrescos){
+        if(x.status === 'proximo' && !it.alertSent.proximo) attemptSyncMaintenance(cfg, it, x, info.atual);
+        if(x.status === 'vencido' && !it.alertSent.vencido) attemptSyncMaintenance(cfg, it, x, info.atual);
       }
-    } else {
-      if(dadosFrescos && info.status === 'proximo' && !cfg.alertSent.proximo){
-        attemptSyncMaintenance(cfg, info);
-      }
-      if(dadosFrescos && info.status === 'vencido' && !cfg.alertSent.vencido){
-        attemptSyncMaintenance(cfg, info);
-      }
-    }
+    });
+    if(resetou){ saveMaint(maintConfigs); publishMaint(cfg, false); }
   });
   renderMaintBanner();
   updatePendingSyncButton();
@@ -2628,11 +2720,14 @@ function retryPendingSyncsInner(){
 
 function pendingMaintAlerts(){
   if(!settings.webhookUrl) return []; // sem a URL do Teams/Planner o alerta não tem para onde ir
-  return maintConfigs.filter(cfg=>{
-    if(!cfg.alertSent) cfg.alertSent = {proximo:false, vencido:false};
+  const out = [];
+  maintConfigs.forEach(cfg=>{
     const info = computeMaintStatus(cfg);
-    return (info.status === 'proximo' && !cfg.alertSent.proximo) || (info.status === 'vencido' && !cfg.alertSent.vencido);
+    info.itens.forEach(x=>{
+      if((x.status === 'proximo' && !x.item.alertSent.proximo) || (x.status === 'vencido' && !x.item.alertSent.vencido)) out.push({cfg, it:x.item, st:x, atual:info.atual});
+    });
   });
+  return out;
 }
 
 // Só é "pendente" o que dá pra enviar de verdade: registro concluído, com trator e com horímetro final
@@ -2693,9 +2788,8 @@ function manualSendPendingInner(){
     else if(r.problema && r.problema.resolvido) evento = 'problema_resolvido';
     promises.push(attemptSync(r, evento, true));
   });
-  pendingMaint.forEach(cfg=>{
-    const info = computeMaintStatus(cfg);
-    promises.push(attemptSyncMaintenance(cfg, info, true));
+  pendingMaint.forEach(p=>{
+    promises.push(attemptSyncMaintenance(p.cfg, p.it, p.st, p.atual, true));
   });
   pendingHorimetro.forEach(r=>{
     promises.push(syncHorimetroAtualizado(r, true));
@@ -3082,7 +3176,8 @@ function importData(evt){
           maintUpdated++;
         } else {
           if(!existing.machineRef && imp.machineRef) existing.machineRef = imp.machineRef;
-          if(imp.intervaloHoras != null && (existing.updatedAt||0) < (imp.updatedAt||0)) existing.intervaloHoras = imp.intervaloHoras;
+          if(Array.isArray(imp.itens) && (existing.updatedAt||0) < (imp.updatedAt||0)){ existing.itens = itensDoRegistro(imp); maintSyncLegacy(existing); }
+          else if(imp.intervaloHoras != null && (existing.updatedAt||0) < (imp.updatedAt||0)) existing.intervaloHoras = imp.intervaloHoras;
           if(imp.horimetroUltimaManutencao != null && (existing.updatedAt||0) < (imp.updatedAt||0)) existing.horimetroUltimaManutencao = imp.horimetroUltimaManutencao;
         }
       });
