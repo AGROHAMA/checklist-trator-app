@@ -376,13 +376,49 @@
   .admin-bar.is-on{background:linear-gradient(135deg,#dcfaf0,#d7f1ff);border-color:var(--green-500);}
   .admin-bar span{flex:1 1 200px;}
   .admin-bar .btn{flex:none;}
+  .busca-box{position:relative;margin-bottom:12px;}
+  .busca-box input{padding:13px 40px 13px 42px;border-radius:999px;border:1.5px solid var(--gray-200);background:#fff;box-shadow:var(--shadow);font-size:16px;}
+  .busca-ico{position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none;}
+  .busca-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;background:none;font-size:24px;color:var(--gray-700);cursor:pointer;}
+
+  /* ===== v02 · Compras ===== */
+  .pchip{border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-700);border-radius:999px;padding:6px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;flex-shrink:0;}
+  .pchip.active{background:var(--grad-btn);border-color:transparent;color:#fff;box-shadow:var(--glow);}
+  .ped-card.urg-parada::before{background:linear-gradient(180deg,#e6254b,#ff6a3d);width:6px;}
+  .ped-card.urg-breve::before{background:linear-gradient(180deg,#ff9a1f,#ffd04d);}
+  .ped-card.urg-planejada::before{background:var(--grad-main);}
+  .ped-st{font-size:11px;}
+  .ped-st.st-solicitado{background:linear-gradient(135deg,#ffe7b0,#ffc766);color:#6b3d00;}
+  .ped-st.st-cotado{background:linear-gradient(135deg,#d9e6ff,#b9d0ff);color:#1a3f99;}
+  .ped-st.st-aprovado{background:linear-gradient(135deg,#c3f7e1,#9aeaff);color:#006244;}
+  .ped-st.st-comprado{background:linear-gradient(135deg,#00b26b,#00b8a9);color:#fff;}
+  .ped-st.st-cancelado{background:var(--gray-200);color:var(--gray-700);}
+  .tab-badge{position:absolute;top:-4px;margin-left:2px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:linear-gradient(135deg,#e6254b,#ff6a3d);color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 2px 6px rgba(230,37,75,.4);}
+  footer.tabs .icon{position:relative;display:inline-block;}
+  footer.tabs button{font-size:11.5px;}
+  .rel-tab{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+  .rel-tab th{text-align:left;font-size:11.5px;color:var(--gray-700);padding:4px 6px;border-bottom:1.5px solid var(--gray-200);}
+  .rel-tab td{padding:6px;border-bottom:1px solid var(--gray-200);}
+  .rel-tab tr.tot td{font-weight:700;border-bottom:none;background:var(--green-100);}
+  /* card de manutenção compacto */
+  .mt-tab{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px;}
+  .mt-tab th{text-align:left;font-size:11px;font-weight:700;color:var(--gray-600);padding:3px 4px;border-bottom:1.5px solid var(--gray-200);}
+  .mt-tab td{padding:6px 4px;border-bottom:1px solid var(--gray-200);vertical-align:middle;}
+  .mt-tab td:first-child{white-space:nowrap;}
+  .mt-venc{color:var(--red-500);} .mt-prox{color:var(--amber-700);}
+  .feita-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;padding:8px;border-radius:12px;background:linear-gradient(135deg,#eafff6,#e6f1ff);}
+  .feita-lbl{font-size:12.5px;font-weight:700;color:var(--green-700);}
+  .feita-btn{min-height:36px;padding:6px 12px;font-size:13px;}
+  .mt-det{margin-top:8px;font-size:12px;color:var(--gray-700);}
+  .mt-det summary{cursor:pointer;font-weight:700;color:var(--green-700);}
+  .maint-card-actions{margin-top:10px;}
 </style>
 </head>
 <body>
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v01</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -495,7 +531,39 @@
 
     <div class="settings-block">
       <h3>Equipamentos cadastrados</h3>
+      <div class="busca-box"><span class="busca-ico">🔍</span><input type="text" inputmode="search" id="maintBusca" placeholder="Buscar máquina (ex: KH 29)" autocomplete="off" oninput="renderMaintenance()"><button type="button" class="busca-x" id="maintBuscaX" style="display:none;" aria-label="Limpar busca" onclick="limparBuscaMaint()">&times;</button></div>
       <div id="maintList"></div>
+    </div>
+  </div>
+
+  <div id="viewPurchases" style="display:none;">
+    <details class="help">
+      <summary>Como funciona (toque para abrir)</summary>
+      <div>
+        Aqui nasce todo pedido de compra de peça ou serviço — no lugar do grupo de WhatsApp.<br><br>
+        1) <b>Qualquer pessoa</b> abre o pedido: máquina, o que precisa, <b>motivo da quebra</b>, urgência e fotos/vídeo. Se o operador pediu ao gerente, o gerente registra aqui mesmo (campo "Registrado por").<br>
+        2) O pedido fica <b>"Aguardando cotação"</b> e o Teams avisa que está <b>sem preço</b>.<br>
+        3) A <b>gerência</b> (senha pessoal) informa fornecedor, valor e prazo. Só depois disso dá pra <b>aprovar</b>.<br>
+        4) Depois da compra, registre ("Registrar compra"). Cada passo vira uma mensagem no canal de compras do Teams, com quem fez e quando.<br><br>
+        As fotos e vídeos vão para a pasta <b>PEDIDOS_COMPRA</b> do SharePoint, uma pasta por máquina, com o nome <b>MÁQUINA - data - número</b>. A gerência também vê aqui o <b>gasto do mês por máquina</b>.
+      </div>
+    </details>
+    <div id="compBar"></div>
+    <div class="actions-row"><button class="btn btn-primary btn-block" onclick="abrirNovoPedido()">＋ Novo pedido de compra</button></div>
+    <div class="filter-row" id="compFilters">
+      <button class="pchip active" data-pf="abertos" onclick="setPedFiltro('abertos')">Abertos</button>
+      <button class="pchip" data-pf="semcot" onclick="setPedFiltro('semcot')">Sem cotação</button>
+      <button class="pchip" data-pf="aprovados" onclick="setPedFiltro('aprovados')">Aprovados</button>
+      <button class="pchip" data-pf="comprados" onclick="setPedFiltro('comprados')">Comprados</button>
+      <button class="pchip" data-pf="todos" onclick="setPedFiltro('todos')">Todos</button>
+    </div>
+    <div id="compList"></div>
+    <div id="compRelWrap" class="settings-block" style="display:none;margin-top:16px;">
+      <h3>Gasto por máquina (gerência)</h3>
+      <div class="field"><label>Mês</label><input type="month" id="rel_mes" onchange="renderRelatorio()"></div>
+      <div id="rel_corpo"></div>
+      <div class="hint" id="rel_info" style="margin-top:6px;"></div>
+      <div class="actions-row" style="margin-top:8px;"><button class="btn btn-secondary btn-sm" onclick="copiarRelatorio()">Copiar relatório para o Teams</button></div>
     </div>
   </div>
 
@@ -521,6 +589,16 @@
         <label>URL — Listar eventos (máquinas em operação)</label>
         <input type="url" id="evListarUrl" placeholder="https://...">
         <div class="hint">Cole a URL do fluxo "Checklist Maquinas - Listar Eventos". Com ela, todos os aparelhos veem quais máquinas estão em operação agora e usam o mesmo horímetro. Configure as DUAS URLs em todos os aparelhos.</div>
+      </div>
+      <div class="field">
+        <label>URL — Pedido de compra: card no Planner</label>
+        <input type="url" id="pedidoMsgUrl" placeholder="https://...">
+        <div class="hint">Cole a URL do fluxo "Pedido de Compra - Planner" (cria o card do pedido no plano PLANO_MAQUINAS_VEICULOS_ETC).</div>
+      </div>
+      <div class="field">
+        <label>URL — Pedido de compra: fotos e vídeos</label>
+        <input type="url" id="pedidoMidiaUrl" placeholder="https://...">
+        <div class="hint">Cole a URL do fluxo "Pedido de Compra - Midia" (salva fotos e vídeos em PEDIDOS_COMPRA, nomeados com a máquina e a data).</div>
       </div>
       <div class="hint" style="margin:2px 0 4px;">✔ O envio automático fica sempre ligado quando há URL configurada.</div>
       <button class="btn btn-secondary btn-block" style="margin-top:12px;" onclick="saveSettings()">Salvar ajustes</button>
@@ -564,6 +642,7 @@
 <footer class="tabs">
   <button id="tabHome" class="active" onclick="switchTab('home')"><span class="icon">📋</span>Registros</button>
   <button id="tabWeek" onclick="switchTab('week')"><span class="icon">📅</span>Semana</button>
+  <button id="tabCompras" onclick="switchTab('compras')"><span class="icon">🛒<span id="compBadge" class="tab-badge" style="display:none;"></span></span>Compras</button>
   <button id="tabMaintenance" onclick="requestTab('maintenance')"><span class="icon">🔧</span>Manutenção</button>
   <button id="tabSettings" onclick="requestTab('settings')"><span class="icon">⚙️</span>Ajustes</button>
 </footer>
@@ -762,6 +841,13 @@
 </div>
 
 <!-- Modal: Senha (PIN) de acesso -->
+<div class="modal-overlay" id="modalPedido">
+  <div class="modal">
+    <div class="modal-title"><span id="pedTitle">Pedido</span><button class="close" onclick="closeModal('modalPedido')">&times;</button></div>
+    <div id="pedBody"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalPin">
   <div class="modal">
     <div class="modal-title"><span id="pinModalTitle">Digite a senha</span><button class="close" onclick="closePinModal()">&times;</button></div>
@@ -799,7 +885,7 @@
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v01';
+const APP_VERSION = 'v02';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1013,7 +1099,7 @@ function saveRecords(records){
    O envio automático é sempre ligado quando existe URL configurada (o operador não precisa
    ativar nem tocar em nada). */
 function applyFixedSettings(s){
-  if(s.webhookUrl || s.webhookUrlManut || s.evGravarUrl || s.evListarUrl) s.autoSync = true;
+  if(s.webhookUrl || s.webhookUrlManut || s.evGravarUrl || s.evListarUrl || s.pedidoMsgUrl || s.pedidoMidiaUrl) s.autoSync = true;
   return s;
 }
 function loadSettings(){
@@ -1167,6 +1253,7 @@ function refreshShared(force){
       evErro = false;
       try{ localStorage.setItem(EV_CACHE_KEY, JSON.stringify(evCache)); }catch(e){}
       try{ mergeSharedMaint(); maintHousekeeping(); checkMaintenanceAlerts(); renderMaintenance(); }catch(e){}
+      try{ mergePedidos(); }catch(e){}
     })
     .catch(()=>{ evErro = true; })
     .finally(()=>{ evRefreshing = false; try{ render(); }catch(e){} });
@@ -1269,7 +1356,7 @@ function sharedHorCands(alvo){
       const n = parseFloat(v);
       if(!isNaN(n)) out.push({v:n, fonte:`operação de ${dataBR(e.data || (inicios[e.refInicio]||{}).data)} (${e.operador||(inicios[e.refInicio]||{}).operador||'-'}), horímetro ${qual}`});
     };
-    if(e.tipo === 'manutencao') return;
+    if(e.tipo === 'manutencao' || e.tipo === 'pedido') return;
     add(e.horimetroInicial, 'inicial');
     if(e.tipo === 'fim'){
       const ini = inicios[e.refInicio];
@@ -1884,6 +1971,7 @@ function markMaintDone(id, itemId){
   toast(`${it.nome}: contagem zerada.`);
 }
 
+function limparBuscaMaint(){ const el = document.getElementById('maintBusca'); if(el){ el.value = ''; el.focus(); } renderMaintenance(); }
 function renderMaintenance(){
   buildEquipDatalist();
   const list = document.getElementById('maintList');
@@ -1894,31 +1982,39 @@ function renderMaintenance(){
   }
   const peso = {vencido:0, proximo:1, sem_dados:2, ok:3};
   const stCard = c => { const g = computeGpsStatus(c); return pioStatus(computeMaintStatus(c).status, g && g.status); };
-  const ordered = [...maintConfigs].sort((a,b)=> peso[stCard(a)] - peso[stCard(b)]);
+  const buscaEl = document.getElementById('maintBusca');
+  const termo = buscaEl ? buscaEl.value.trim() : '';
+  const bx = document.getElementById('maintBuscaX'); if(bx) bx.style.display = termo ? 'block' : 'none';
+  const alvoN = normEquip(termo), alvoT = termo.toLowerCase();
+  const visiveis = termo ? maintConfigs.filter(c => {
+    const nome = String(c.trator||'');
+    return (alvoN && normEquip(nome).indexOf(alvoN) >= 0) || nome.toLowerCase().indexOf(alvoT) >= 0 || (c.machineRef && String(c.machineRef).indexOf(termo) >= 0);
+  }) : maintConfigs;
+  if(termo && visiveis.length === 0){ list.innerHTML = `<div class="empty">Nenhuma máquina encontrada para "${escapeHtml(termo)}".</div>`; return; }
+  const ordered = [...visiveis].sort((a,b)=> peso[stCard(a)] - peso[stCard(b)]);
   list.innerHTML = ordered.map(cfg=>{
     const info = computeMaintStatus(cfg);
     const emoji = {ok:'🟢', proximo:'🟡', vencido:'🔴', sem_dados:'⚪'};
     const temManutencaoConfigurada = info.itens.length > 0;
-    const itensHtml = info.itens.map(x=>{
-      const rt = x.restante === null ? 'sem horímetro da última troca' : (x.restante <= 0
-        ? `vencida há ${Math.abs(x.restante).toFixed(1)} h`
-        : `faltam ${x.restante.toFixed(1)} h`);
-      return `<div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--gray-200,#ddd);">
-        ${emoji[x.status]} <b>${escapeHtml(x.item.nome)}</b><br>
-        <span style="font-size:.92em;">A cada <b>${escapeHtml(String(x.item.intervaloHoras))} h</b> · última em <b>${escapeHtml(String(x.item.horimetroUltima||'—'))}</b> · próxima em <b>${x.limite === null ? '—' : x.limite}</b> (${rt})</span><br>
-        ${isAdmin() ? `<button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="markMaintDone('${cfg.id}','${x.item.id}')">Feita agora</button>` : ''}
-      </div>`;
+    const curto = n => String(n||'').replace(/\s*\(.*$/, '').replace(/ do motor$/i, '');
+    const fmtH = v => (v === null || v === undefined || isNaN(v)) ? '—' : String(Math.round(v*10)/10).replace('.', ',');
+    const linhasHtml = info.itens.map(x=>{
+      const falta = x.restante === null ? '—' : (x.restante <= 0 ? `<b class="mt-venc">venceu ${fmtH(Math.abs(x.restante))} h</b>` : (x.status === 'proximo' ? `<b class="mt-prox">${fmtH(x.restante)} h</b>` : `${fmtH(x.restante)} h`));
+      return `<tr><td>${emoji[x.status]} <b>${escapeHtml(curto(x.item.nome))}</b></td><td>${escapeHtml(String(x.item.intervaloHoras))} h</td><td>${x.limite === null ? '—' : fmtH(x.limite)}</td><td>${falta}</td></tr>`;
     }).join('');
+    const feitaHtml = (isAdmin() && info.itens.length)
+      ? `<div class="feita-row"><span class="feita-lbl">✔ Feita agora:</span>${info.itens.map(x=>`<button class="btn btn-secondary btn-sm feita-btn" onclick="markMaintDone('${cfg.id}','${x.item.id}')">${escapeHtml(curto(x.item.nome))}</button>`).join('')}</div>`
+      : '';
+    const suspHtml = (info.suspeitos||[]).map(x=>`<div style="font-size:.85em;color:var(--amber-700);margin-top:4px;">⚠️ Valor ${x.v} ignorado (parece erro de digitação): ${escapeHtml(x.fonte)}. Corrija ou apague esse registro.</div>`).join('');
     const manutencaoHtml = temManutencaoConfigurada
-      ? `Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : info.atual}</b>${info.fonte ? `<br><span style="font-size:.85em;opacity:.75;">Fonte: ${escapeHtml(info.fonte)}</span>` : ''}${(info.suspeitos||[]).map(x=>`<br><span style="font-size:.9em;color:var(--amber-700);">⚠️ Valor ${x.v} ignorado (parece erro de digitação): ${escapeHtml(x.fonte)}. Corrija ou apague esse registro.</span>`).join('')}${itensHtml}`
+      ? `<div>Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : fmtH(info.atual)}</b></div>${suspHtml}
+         <table class="mt-tab"><tr><th>Item</th><th>A cada</th><th>Próxima em</th><th>Falta</th></tr>${linhasHtml}</table>${feitaHtml}`
       : `Manutenção por horímetro: <b>não configurada</b> nesse equipamento.`;
     const gps = computeGpsStatus(cfg);
-    const gpsHtml = gps ? `<br>📡 GPS: <b style="color:${gps.status==='vencido'?'var(--red-500,#c0392b)':(gps.status==='proximo'?'var(--amber-700)':'inherit')}">${gpsTexto(gps)}</b>` : '';
+    const gpsHtml = gps ? `<div style="margin-top:6px;">📡 GPS: <b style="color:${gps.status==='vencido'?'var(--red-500,#c0392b)':(gps.status==='proximo'?'var(--amber-700)':'inherit')}">${gpsTexto(gps)}</b></div>` : '';
     const stGeral = pioStatus(info.status, gps && gps.status);
     const preview = previewFormNumber(cfg);
-    const numeracaoHtml = preview
-      ? `<br>📋 Exemplo de talão se iniciar agora: <b>${preview}</b> (referência ${cfg.machineRef})`
-      : `<br>📋 Numeração do talão: <b>número de referência não cadastrado</b>.`;
+    const detalhes = `<details class="mt-det"><summary>Mais detalhes</summary>${info.fonte ? `<div>Fonte do horímetro: ${escapeHtml(info.fonte)}</div>` : ''}${preview ? `<div>📋 Exemplo de talão se iniciar agora: <b>${preview}</b> (referência ${escapeHtml(String(cfg.machineRef))})</div>` : `<div>📋 Numeração do talão: <b>número de referência não cadastrado</b>.</div>`}</details>`;
     return `
     <div class="maint-card st-${stGeral}">
       <div class="maint-card-head">
@@ -1926,7 +2022,7 @@ function renderMaintenance(){
         <span class="maint-status-pill st-${stGeral}">${maintStatusLabel(stGeral)}</span>
       </div>
       <div class="maint-card-meta">
-        ${manutencaoHtml}${gpsHtml}${numeracaoHtml}
+        ${manutencaoHtml}${gpsHtml}${detalhes}
       </div>
       ${isAdmin() ? `<div class="maint-card-actions">
         <button class="btn btn-secondary btn-sm" onclick="editMaintConfig('${cfg.id}')">Editar</button>
@@ -2779,6 +2875,7 @@ function retryPendingSyncs(){
 function retryPendingSyncsInner(){
   if(!navigator.onLine) return;
   sendEventos(); sendCancels(); refreshShared();
+  try{ comprasSync(); }catch(e){}
   if(settings.webhookUrl && settings.autoSync){
     records.filter(r=>!r.synced).forEach(r=>{
       let evento = r.status === 'andamento' ? 'inicio' : 'fechamento';
@@ -3003,6 +3100,8 @@ function switchTab(tab){
   document.getElementById('viewHome').style.display = tab==='home' ? 'block' : 'none';
   document.getElementById('viewWeek').style.display = tab==='week' ? 'block' : 'none';
   document.getElementById('viewMaintenance').style.display = tab==='maintenance' ? 'block' : 'none';
+  document.getElementById('viewPurchases').style.display = tab==='compras' ? 'block' : 'none';
+  document.getElementById('tabCompras').classList.toggle('active', tab==='compras');
   document.getElementById('viewSettings').style.display = tab==='settings' ? 'block' : 'none';
   document.getElementById('tabHome').classList.toggle('active', tab==='home');
   document.getElementById('tabWeek').classList.toggle('active', tab==='week');
@@ -3014,10 +3113,16 @@ function switchTab(tab){
     document.getElementById('webhookUrlManut').value = settings.webhookUrlManut || '';
     document.getElementById('evGravarUrl').value = settings.evGravarUrl || '';
     document.getElementById('evListarUrl').value = settings.evListarUrl || '';
+    document.getElementById('pedidoMsgUrl').value = settings.pedidoMsgUrl || '';
+    document.getElementById('pedidoMidiaUrl').value = settings.pedidoMidiaUrl || '';
     renderSecurityBlock();
   }
   if(tab==='week'){
     renderWeek(true);
+  }
+  if(tab==='compras'){
+    comprasAbrir();
+    if(settings.evListarUrl) refreshShared();
   }
   if(tab==='maintenance'){
     resetMaintForm();
@@ -3030,6 +3135,8 @@ function saveSettings(){
   settings.webhookUrlManut = document.getElementById('webhookUrlManut').value.trim();
   settings.evGravarUrl = document.getElementById('evGravarUrl').value.trim();
   settings.evListarUrl = document.getElementById('evListarUrl').value.trim();
+  settings.pedidoMsgUrl = document.getElementById('pedidoMsgUrl').value.trim();
+  settings.pedidoMidiaUrl = document.getElementById('pedidoMidiaUrl').value.trim();
   settings.autoSync = false; // applyFixedSettings liga sozinho quando existe URL
   applyFixedSettings(settings);
   saveSettingsObj(settings);
@@ -3155,6 +3262,7 @@ function pinBackspace(){
 }
 function handlePinComplete(){
   const entered = pinBuffer;
+  if(pinMode === 'aprov' && typeof handleAprovPin === 'function'){ handleAprovPin(entered); return; }
   if(pinMode === 'admin'){
     if(Date.now() < adminBloqueadoAte){
       setPinError(`Muitas tentativas. Aguarde ${Math.ceil((adminBloqueadoAte-Date.now())/1000)} s.`);
@@ -3535,6 +3643,578 @@ if('serviceWorker' in navigator){
     recarregarQuandoSeguro();
   });
 }
+</script>
+<script>
+/* ===================== COMPRAS (v02): pedido de compra com foto/vídeo, cotação e aprovação =====================
+   Substitui o "preciso comprar isso pra máquina tal" do grupo de WhatsApp. O pedido nasce "Aguardando cotação"
+   e só pode ser aprovado depois que a gerência informar fornecedor, valor e prazo (senha pessoal de cada gerente).
+   - O pedido é compartilhado como arquivo p_<id>_<hora>.json na pasta de eventos (mesmo fluxo "Gravar Evento");
+     cada mudança de status gera um arquivo novo e vale o mais recente.
+   - Cada mudança também vira uma mensagem no canal de compras do Teams (fluxo "Pedido de Compra - Teams").
+   - Fotos/vídeos ficam no aparelho (IndexedDB) até haver sinal, e sobem com o nome "MÁQUINA - dd-mm-aaaa - n.jpg"
+     para a pasta PEDIDOS_COMPRA/<máquina> do SharePoint (fluxo "Pedido de Compra - Midia"). */
+const PED_KEY = 'agrohama_pedidos_v1';
+const PED_QUEUE_KEY = 'agrohama_pedidos_queue_v1';
+const PED_MSGQ_KEY = 'agrohama_pedidos_msgq_v1';
+const PED_SOLIC_KEY = 'agrohama_pedidos_solicitante_v1';
+const PED_MIDIA_MAX = 8;
+const PED_VIDEO_MAX_MB = 40;
+const APROV_SESSAO_MS = 5*60*1000;
+// Gerência autorizada a cotar/aprovar. Só o "hash" da senha de 4 dígitos fica no app (bloqueio de uso, não é segurança bancária).
+const APROVADORES = [{"nome": "Rodolfo Ferreira", "hash": "67cf1c9b26d82d9b8469a97ed4eb3c61a91d17e78caac111937890ecca0db9f4"}, {"nome": "Luiz Masao", "hash": "76a2e8ee76a4087f3af82ae05990159ed1ab7b94e13e8ea79309a577bfad7081"}, {"nome": "Mauricio Fujita", "hash": "880b4345539c7a1e7098f9bacb57d29d9f0bcea6971fc3a1b32e6ce20b33e06f"}];
+const URG = {
+  parada:{rot:'Máquina parada', ico:'🔴', peso:0},
+  breve:{rot:'Vai parar em breve', ico:'🟠', peso:1},
+  planejada:{rot:'Reposição planejada', ico:'🟢', peso:2}
+};
+const PST = {
+  solicitado:{rot:'Aguardando cotação', ico:'⏳'},
+  cotado:{rot:'Cotado — aguardando aprovação', ico:'💲'},
+  aprovado:{rot:'Aprovado — aguardando compra', ico:'✅'},
+  comprado:{rot:'Comprado', ico:'📦'},
+  cancelado:{rot:'Cancelado', ico:'⛔'}
+};
+function lerJSON(k, def){ try{ const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; }catch(e){ return def; } }
+function gravarJSON(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+let pedidos = lerJSON(PED_KEY, []);
+function salvarPedidos(){ gravarJSON(PED_KEY, pedidos); }
+function loadPedQueue(){ return lerJSON(PED_QUEUE_KEY, []); }
+function savePedQueue(q){ gravarJSON(PED_QUEUE_KEY, q); }
+function loadPedMsgs(){ return lerJSON(PED_MSGQ_KEY, []); }
+function savePedMsgs(q){ gravarJSON(PED_MSGQ_KEY, q); }
+
+const p2 = n => String(n).padStart(2,'0');
+function fmtDH(ts){ const d = new Date(ts); return `${p2(d.getDate())}/${p2(d.getMonth()+1)} ${p2(d.getHours())}:${p2(d.getMinutes())}`; }
+function fmtDMA(ts){ const d = new Date(ts); return `${p2(d.getDate())}-${p2(d.getMonth()+1)}-${d.getFullYear()}`; }
+function haTempo(ts){
+  const m = Math.max(0, Math.floor((Date.now()-ts)/60000));
+  if(m < 60) return m + ' min';
+  const h = Math.floor(m/60);
+  return h < 48 ? h + ' h' : Math.floor(h/24) + ' d';
+}
+function parseBRL(s){
+  s = String(s == null ? '' : s).replace(/[^\d,.\-]/g, '');
+  if(!s) return NaN;
+  if(s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  return parseFloat(s);
+}
+function fmtBRL(v){ return (typeof v === 'number' && !isNaN(v)) ? v.toLocaleString('pt-BR', {style:'currency', currency:'BRL'}) : '—'; }
+function codigoPedido(p){ return 'PC-' + String(p.pid).slice(-5).toUpperCase(); }
+function nomeSeguro(s){ return String(s||'').replace(/[\\\/:*?"<>|#%~&{}]/g, '').replace(/\s+/g, ' ').trim(); }
+function primeiroNome(n){ return String(n||'').split(' ')[0]; }
+
+/* ---------- Senha da gerência (cada gerente tem a sua) ---------- */
+let aprovador = null, aprovFalhas = 0, aprovBloq = 0, aprovCb = null;
+function aprovHash(pin){ return sha256hex('agrohama|' + pin + '|compras'); }
+function aprovadorAtual(){ return (aprovador && Date.now() < aprovador.ate) ? aprovador.nome : null; }
+function pedirAprovador(cb){
+  if(aprovadorAtual()){ aprovador.ate = Date.now() + APROV_SESSAO_MS; if(cb) cb(aprovador.nome); return true; }
+  pinMode = 'aprov'; aprovCb = cb || null; pinBuffer = '';
+  setPinTitle('Senha da gerência'); setPinError(''); updatePinDots();
+  openModal('modalPin');
+  return false;
+}
+function handleAprovPin(entered){
+  if(Date.now() < aprovBloq){
+    setPinError(`Muitas tentativas. Aguarde ${Math.ceil((aprovBloq-Date.now())/1000)} s.`);
+    pinBuffer = ''; updatePinDots(); return;
+  }
+  const h = aprovHash(entered);
+  const a = APROVADORES.find(x => x.hash === h);
+  if(a){
+    aprovFalhas = 0;
+    aprovador = {nome:a.nome, ate:Date.now() + APROV_SESSAO_MS};
+    const cb = aprovCb;
+    closePinModal();
+    toast('Olá, ' + primeiroNome(a.nome) + '. Acesso da gerência liberado por 5 min.');
+    renderCompras();
+    if(cb) cb(a.nome);
+  } else {
+    aprovFalhas++;
+    if(aprovFalhas >= 5){ aprovFalhas = 0; aprovBloq = Date.now() + 60000; setPinError('Muitas tentativas. Aguarde 60 s.'); }
+    else setPinError('Senha incorreta.');
+    pinBuffer = ''; updatePinDots();
+  }
+}
+function entrarGerencia(){ pedirAprovador(()=>{}); }
+function sairGerencia(){ aprovador = null; renderCompras(); if(document.getElementById('modalPedido').classList.contains('open')) pedAbrirDet(pedAtual); toast('Acesso da gerência encerrado.'); }
+function comAprovador(fn){ pedirAprovador(nome => fn(nome)); }
+
+/* ---------- Mídia (IndexedDB) ---------- */
+function idbAbrir(){
+  return new Promise((res, rej)=>{
+    if(!window.indexedDB){ rej(new Error('sem indexedDB')); return; }
+    const r = indexedDB.open('agrohama_pedidos_midia', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('midia', {keyPath:'id'}); };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function idbPut(o){ return idbAbrir().then(db => new Promise((res, rej)=>{ const t = db.transaction('midia','readwrite'); t.objectStore('midia').put(o); t.oncomplete = () => res(true); t.onerror = () => rej(t.error); })); }
+function idbTodos(){ return idbAbrir().then(db => new Promise((res, rej)=>{ const q = db.transaction('midia','readonly').objectStore('midia').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => rej(q.error); })); }
+function idbApagar(id){ return idbAbrir().then(db => new Promise((res, rej)=>{ const t = db.transaction('midia','readwrite'); t.objectStore('midia').delete(id); t.oncomplete = () => res(true); t.onerror = () => rej(t.error); })); }
+let pedMidiaPendentes = 0;
+function atualizarPendMidia(){ return idbTodos().then(l => { pedMidiaPendentes = l.length; try{ renderComprasBar(); }catch(e){} return l.length; }).catch(()=>0); }
+function blobParaBase64(blob){
+  return new Promise((res, rej)=>{ const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1] || ''); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
+}
+let pedMidiaEnviando = false;
+function enviarMidias(){
+  if(!settings.pedidoMidiaUrl || !navigator.onLine || pedMidiaEnviando) return Promise.resolve();
+  pedMidiaEnviando = true;
+  return idbTodos().then(async lista => {
+    for(const m of lista){
+      try{
+        const b64 = await blobParaBase64(m.blob);
+        const resp = await fetchTimeout(settings.pedidoMidiaUrl, {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({maquina:m.maquina, nome:m.nome, mime:m.mime, pasta:'PEDIDOS_COMPRA/' + m.maquina, arquivo:{'$content-type':m.mime, '$content':b64}})}, 180000);
+        if(!resp.ok) throw new Error('http ' + resp.status);
+        await idbApagar(m.id);
+        const p = pedidos.find(x => x.pid === m.pid);
+        const mm = p && (p.midia||[]).find(x => x.nome === m.nome);
+        if(mm){ mm.ok = true; salvarPedidos(); }
+      }catch(e){ break; } // sinal ruim: tenta de novo depois, na ordem
+    }
+  }).catch(()=>{}).finally(()=>{ pedMidiaEnviando = false; atualizarPendMidia(); try{ renderCompras(); }catch(e){} });
+}
+
+/* ---------- Publicação (arquivo p_ compartilhado + mensagem no Teams) ---------- */
+function pedRegistro(p){
+  return {id:'p_' + p.pid + '_' + (p.updatedAt||Date.now()).toString(36), tipo:'pedido', maquina:p.maquina, criadoEm:p.updatedAt, pedido:p};
+}
+function publicarPedido(p, acaoMsg){
+  p.updatedAt = Math.max(Date.now(), (p.updatedAt||0) + 1);
+  salvarPedidos();
+  if(settings.evGravarUrl){
+    const q = loadPedQueue().filter(x => x.pedido.pid !== p.pid);
+    q.push(pedRegistro(JSON.parse(JSON.stringify(p))));
+    savePedQueue(q);
+  }
+  if(acaoMsg === 'novo' && settings.pedidoMsgUrl){ /* por ora só o pedido novo vira card; os demais passos ficam no app */
+    const m = loadPedMsgs();
+    m.push(montarMensagem(p, acaoMsg));
+    savePedMsgs(m);
+  }
+  renderCompras();
+  return comprasSync(true);
+}
+function enviarFilaPedidos(force){
+  if(!settings.evGravarUrl) return Promise.resolve();
+  if(!force && !navigator.onLine) return Promise.resolve();
+  const ps = loadPedQueue().filter(r => !syncInFlight.has('p:' + r.id)).map(r => {
+    syncInFlight.add('p:' + r.id);
+    return fetchTimeout(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({registro:r})}, 60000)
+      .then(resp => { if(resp.ok){ savePedQueue(loadPedQueue().filter(x => x.id !== r.id)); sharedEvents = sharedEvents.concat([r]); } return resp.ok; })
+      .catch(()=>false).finally(()=>syncInFlight.delete('p:' + r.id));
+  });
+  return Promise.all(ps);
+}
+function enviarMensagens(force){
+  if(!settings.pedidoMsgUrl) return Promise.resolve();
+  if(!force && !navigator.onLine) return Promise.resolve();
+  const ps = loadPedMsgs().filter(m => !syncInFlight.has('pm:' + m.id)).map(m => {
+    syncInFlight.add('pm:' + m.id);
+    return fetchTimeout(settings.pedidoMsgUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(m)}, 60000)
+      .then(resp => { if(resp.ok) savePedMsgs(loadPedMsgs().filter(x => x.id !== m.id)); return resp.ok; })
+      .catch(()=>false).finally(()=>syncInFlight.delete('pm:' + m.id));
+  });
+  return Promise.all(ps);
+}
+function comprasSync(force){
+  return Promise.all([enviarFilaPedidos(force), enviarMensagens(force)]).then(()=>{ enviarMidias(); try{ renderComprasBar(); }catch(e){} });
+}
+function mergePedidos(){
+  const latest = new Map();
+  sharedEvents.concat(loadPedQueue()).forEach(e => {
+    if(!e || e.tipo !== 'pedido' || !e.pedido || !e.pedido.pid) return;
+    const cur = latest.get(e.pedido.pid);
+    if(!cur || (e.pedido.updatedAt||0) > (cur.pedido.updatedAt||0)) latest.set(e.pedido.pid, e);
+  });
+  let mudou = false;
+  latest.forEach((e, pid) => {
+    const novo = e.pedido, i = pedidos.findIndex(p => p.pid === pid);
+    if(i < 0){ pedidos.push(novo); mudou = true; }
+    else if((novo.updatedAt||0) > (pedidos[i].updatedAt||0)){
+      const velhos = pedidos[i].midia || [];
+      novo.midia = (novo.midia||[]).map(m => { const v = velhos.find(x => x.nome === m.nome); return v && v.ok ? Object.assign({}, m, {ok:true}) : m; });
+      pedidos[i] = novo; mudou = true;
+    }
+  });
+  if(mudou){ salvarPedidos(); try{ renderCompras(); }catch(e){} }
+  return mudou;
+}
+
+/* ---------- Mensagem profissional para o Teams ---------- */
+function montarMensagem(p, acao){
+  const e = escapeHtml, urg = URG[p.urgencia] || URG.planejada;
+  const titulos = {novo:'🛒 Novo pedido de compra', cotado:'💲 Pedido cotado', aprovado:'✅ Pedido aprovado', comprado:'📦 Pedido comprado', cancelado:'⛔ Pedido cancelado'};
+  const linhas = [];
+  linhas.push(`<b>${e(codigoPedido(p))}</b> · ${urg.ico} <b>${e(urg.rot)}</b>`);
+  linhas.push(`<b>Máquina:</b> ${e(p.maquina)}${p.horimetro ? ' · horímetro ' + e(String(p.horimetro)) : ''}`);
+  linhas.push(`<b>Item:</b> ${e(p.item)}${p.qtd ? ' (' + e(p.qtd) + ')' : ''}`);
+  linhas.push(`<b>Motivo:</b> ${e(p.motivo)}`);
+  linhas.push(`<b>Pedido por:</b> ${e(p.solicitante)}${p.registradoPor && p.registradoPor !== p.solicitante ? ' · registrado por ' + e(p.registradoPor) : ''} em ${fmtDH(p.criadoEm)}`);
+  if(p.midia && p.midia.length) linhas.push(`<b>Anexos:</b> ${p.midia.length} arquivo(s) na pasta PEDIDOS_COMPRA/${e(p.maquina)} (${e(p.midia.map(m=>m.nome).join('; '))})`);
+  if(acao === 'novo') linhas.push(`⏳ <b>Sem cotação.</b> A gerência precisa informar fornecedor, valor e prazo antes de aprovar.`);
+  if(p.cotacoes && p.cotacoes.length && acao !== 'novo'){
+    linhas.push('<b>Cotações:</b>');
+    p.cotacoes.forEach((c, i) => linhas.push(`${i === p.escolhida && (acao === 'aprovado' || acao === 'comprado') ? '✔ ' : '• '}${e(c.fornecedor)} — ${fmtBRL(c.valor)} — prazo ${e(c.prazo||'a combinar')}`));
+  }
+  if(acao === 'cotado') linhas.push(`Cotado por ${e(p.cotadoPor||'-')}. Aguardando aprovação.`);
+  if(acao === 'aprovado') linhas.push(`Aprovado por <b>${e(p.aprovadoPor||'-')}</b>${p.cotacoes && p.cotacoes[p.escolhida] ? ' — valor aprovado <b>' + fmtBRL(p.cotacoes[p.escolhida].valor) + '</b>' : ''}.`);
+  if(acao === 'comprado') linhas.push(`Compra registrada por ${e(p.compradoPor||'-')}${p.obsCompra ? ' — ' + e(p.obsCompra) : ''}.`);
+  if(acao === 'cancelado') linhas.push(`Cancelado por ${e(p.cancelPor||'-')}${p.cancelMotivo ? ' — ' + e(p.cancelMotivo) : ''}.`);
+  /* Card do Planner: título curto + descrição em texto puro (o Planner não aceita HTML) */
+  const txt = linhas.map(l => l.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'"));
+  const descricao = `${(titulos[acao] || 'Pedido').replace(/^\S+\s/, '')} — ${p.maquina}\n` + txt.join('\n');
+  const cardTitulo = `${codigoPedido(p)} · ${p.maquina} · ${p.item}${p.qtd ? ' (' + p.qtd + ')' : ''} · ${urg.rot}`.slice(0, 250);
+  return {id:'m' + p.pid + acao + Date.now().toString(36), acao, codigo:codigoPedido(p), maquina:p.maquina,
+    cardTitulo, descricao, bucket:'COTAÇÃO PEÇAS', prioridade:(p.urgencia === 'parada' ? 1 : p.urgencia === 'breve' ? 3 : 5),
+    titulo:`${titulos[acao] || 'Pedido'} — ${p.maquina}`, mensagem:`<h3>${titulos[acao] || 'Pedido'} — ${e(p.maquina)}</h3>` + linhas.join('<br>')};
+}
+
+/* ---------- Tela Compras ---------- */
+let pedFiltro = 'abertos', pedAtual = null;
+function pedValor(p){ return (p.cotacoes && p.cotacoes[p.escolhida]) ? p.cotacoes[p.escolhida].valor : NaN; }
+function pedFiltra(p){
+  const s = p.status;
+  if(pedFiltro === 'abertos') return s === 'solicitado' || s === 'cotado' || s === 'aprovado';
+  if(pedFiltro === 'semcot') return s === 'solicitado';
+  if(pedFiltro === 'aprovados') return s === 'aprovado';
+  if(pedFiltro === 'comprados') return s === 'comprado';
+  return true;
+}
+function renderComprasBar(){
+  const el = document.getElementById('compBar');
+  if(!el) return;
+  const ap = aprovadorAtual();
+  const pend = loadPedQueue().length + loadPedMsgs().length + pedMidiaPendentes;
+  const avisos = [];
+  if(!settings.evGravarUrl) avisos.push('Falta a URL "Gravar evento" em Ajustes: os pedidos ficam só neste aparelho.');
+  if(!settings.pedidoMsgUrl) avisos.push('Falta a URL do fluxo de mensagem de compras (Ajustes): o card não será criado no Planner.');
+  if(!settings.pedidoMidiaUrl) avisos.push('Falta a URL do fluxo de fotos/vídeos (Ajustes): as mídias ficam só neste aparelho.');
+  el.innerHTML = (ap
+    ? `<div class="admin-bar is-on"><span>🔓 <b>${escapeHtml(ap)}</b> — gerência. Cotação e aprovação liberadas (5 min).</span><button class="btn btn-ghost btn-sm" onclick="sairGerencia()">Sair</button></div>`
+    : `<div class="admin-bar"><span>🔒 Qualquer um abre um pedido. <b>Cotar e aprovar</b> é só da gerência, com senha pessoal.</span><button class="btn btn-primary btn-sm" onclick="entrarGerencia()">Entrar como gerência</button></div>`)
+    + (pend ? `<div class="hint" style="margin:-6px 0 10px;">📤 ${pend} item(ns) aguardando envio (aparecem no Teams/SharePoint quando houver sinal).</div>` : '')
+    + (avisos.length ? `<div class="hint hint-warn" style="margin:-6px 0 10px;">${avisos.map(escapeHtml).join('<br>')}</div>` : '');
+}
+function renderComprasBadge(){
+  const n = pedidos.filter(p => p.status === 'solicitado').length;
+  const b = document.getElementById('compBadge');
+  if(b){ b.textContent = n > 99 ? '99+' : String(n); b.style.display = n ? 'inline-block' : 'none'; }
+}
+function pedCard(p){
+  const urg = URG[p.urgencia] || URG.planejada, st = PST[p.status] || PST.solicitado;
+  const ap = !!aprovadorAtual();
+  const ch = p.cotacoes && p.cotacoes[p.escolhida];
+  const semCot = p.status === 'solicitado';
+  const velho = semCot && (Date.now() - p.criadoEm) > 24*3600*1000;
+  const valorHtml = ch ? (ap ? ` · <b>${fmtBRL(ch.valor)}</b> (${escapeHtml(ch.fornecedor)})` : ' · cotado') : '';
+  const anexos = (p.midia||[]).length ? ` · 📎 ${(p.midia||[]).length}` : '';
+  return `<div class="card ped-card urg-${p.urgencia}" onclick="pedAbrirDet('${p.pid}')" style="cursor:pointer;">
+    <div class="card-header">
+      <div><div class="op-title">🚜 ${escapeHtml(p.maquina)} — ${escapeHtml(p.item)}${p.qtd ? ' <span style="font-weight:600;">(' + escapeHtml(p.qtd) + ')</span>' : ''}</div>
+      <div class="op-sub">${urg.ico} ${urg.rot} · ${escapeHtml(codigoPedido(p))} · ${escapeHtml(p.solicitante)} · ${fmtDH(p.criadoEm)}</div></div>
+      <span class="badge ped-st st-${p.status}">${st.ico} ${st.rot.split(' — ')[0]}</span>
+    </div>
+    <div class="card-meta"><span>${escapeHtml((p.motivo||'').slice(0,110))}${(p.motivo||'').length > 110 ? '…' : ''}</span></div>
+    <div class="card-meta"><span>${st.ico} ${st.rot}${valorHtml}${anexos}</span>${velho ? `<span class="hint-warn">⚠️ sem cotação há ${haTempo(p.criadoEm)}</span>` : ''}</div>
+  </div>`;
+}
+function renderCompras(){
+  renderComprasBar(); renderComprasBadge();
+  const list = document.getElementById('compList');
+  if(!list) return;
+  document.querySelectorAll('#compFilters .pchip').forEach(c => c.classList.toggle('active', c.dataset.pf === pedFiltro));
+  const itens = pedidos.filter(pedFiltra).sort((a,b) => {
+    const ua = (URG[a.urgencia]||URG.planejada).peso, ub = (URG[b.urgencia]||URG.planejada).peso;
+    if(pedFiltro === 'abertos' || pedFiltro === 'semcot'){ if(ua !== ub) return ua - ub; return a.criadoEm - b.criadoEm; }
+    return b.updatedAt - a.updatedAt;
+  });
+  list.innerHTML = itens.length ? itens.map(pedCard).join('') : '<div class="empty">Nenhum pedido aqui.</div>';
+  const rel = document.getElementById('compRelWrap');
+  if(rel){ rel.style.display = aprovadorAtual() ? 'block' : 'none'; if(aprovadorAtual()) renderRelatorio(); }
+}
+function setPedFiltro(f){ pedFiltro = f; renderCompras(); }
+
+/* ---------- Novo pedido ---------- */
+let pedForm = {files:[]};
+function proximoNumeroMidia(maquina, ts){
+  const pref = `${maquina} - ${fmtDMA(ts)} - `;
+  let max = 0;
+  pedidos.forEach(p => (p.midia||[]).forEach(m => { if(m.nome.indexOf(pref) === 0){ const n = parseInt(m.nome.slice(pref.length), 10); if(n > max) max = n; } }));
+  return max + 1;
+}
+function maquinaDoForm(){ const v = (document.getElementById('pd_maquina')||{}).value || ''; return nomeSeguro(nomeParaManutencao(v.trim())); }
+function abrirNovoPedido(){
+  pedForm = {files:[]};
+  const sol = (()=>{ try{ return localStorage.getItem(PED_SOLIC_KEY) || ''; }catch(e){ return ''; } })();
+  document.getElementById('pedTitle').textContent = 'Novo pedido de compra';
+  document.getElementById('pedBody').innerHTML = `
+    <div class="ref-box">Descreva o que precisa e <b>por quê</b>. A gerência vai cotar o preço antes de aprovar — pedido bem explicado, com foto, sai mais rápido.</div>
+    <div class="field"><label>Máquina</label><input type="text" id="pd_maquina" list="equipSuggestions" placeholder="ex: KH 29" oninput="pedHorimetro(this.value);pedRenderFiles()"></div>
+    <div class="field"><label>O que precisa (peça ou serviço)</label><input type="text" id="pd_item" placeholder="ex: filtro de óleo hidráulico"></div>
+    <div class="row2">
+      <div class="field"><label>Quantidade</label><input type="text" id="pd_qtd" value="1" placeholder="ex: 2 un"></div>
+      <div class="field"><label>Horímetro atual</label><input type="number" id="pd_horimetro" step="0.1" placeholder="automático"></div>
+    </div>
+    <div class="field"><label>Motivo / o que aconteceu</label><textarea id="pd_motivo" placeholder="Explique a razão da quebra ou da necessidade. Ex: vazamento no cilindro, trocou o óleo e o filtro entupiu…"></textarea><div class="hint">Obrigatório — mínimo de uma frase.</div></div>
+    <div class="field"><label>Urgência</label>
+      <select id="pd_urg"><option value="breve">🟠 Vai parar em breve</option><option value="parada">🔴 Máquina parada</option><option value="planejada">🟢 Reposição planejada</option></select></div>
+    <div class="row2">
+      <div class="field"><label>Quem precisa (operador/mecânico)</label><input type="text" id="pd_solic" value="${escapeHtml(sol)}" placeholder="nome"></div>
+      <div class="field"><label>Registrado por (se for outro)</label><input type="text" id="pd_regpor" placeholder="opcional"></div>
+    </div>
+    <div class="field"><label>Fotos e vídeos</label>
+      <div class="actions-row" style="margin-bottom:6px;"><button class="btn btn-secondary btn-sm" onclick="document.getElementById('pd_file').click()">📷 Adicionar foto / vídeo</button></div>
+      <input type="file" id="pd_file" accept="image/*,video/*" multiple style="display:none;" onchange="pedAddFiles(this.files);this.value='';">
+      <div id="pd_files"></div>
+      <div class="hint">Até ${PED_MIDIA_MAX} arquivos; vídeos curtos (máx. ${PED_VIDEO_MAX_MB} MB). Os arquivos são salvos com o nome da máquina e a data, ex: <b>KH 29 - ${fmtDMA(Date.now())} - 1.jpg</b>.</div>
+    </div>
+    <div class="actions-row"><button class="btn btn-primary" id="pd_enviar" onclick="enviarPedido()">Enviar pedido</button></div>`;
+  openModal('modalPedido');
+}
+function pedHorimetro(v){
+  const el = document.getElementById('pd_horimetro');
+  if(!el || el.dataset.manual) return;
+  const h = v ? horimetroInfo(nomeParaManutencao(v.trim())) : null;
+  el.value = (h && h.atual !== null) ? h.atual : '';
+}
+function comprimirImagem(file){
+  return new Promise(res => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const max = 1600, s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => { URL.revokeObjectURL(url); res(b ? {blob:b, mime:'image/jpeg', ext:'jpg', tipo:'foto'} : null); }, 'image/jpeg', 0.72);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(null); };
+    img.src = url;
+  });
+}
+async function pedAddFiles(fl){
+  for(const f of Array.from(fl || [])){
+    if(pedForm.files.length >= PED_MIDIA_MAX){ toast(`Máximo de ${PED_MIDIA_MAX} arquivos por pedido.`); break; }
+    if((f.type||'').indexOf('video/') === 0){
+      if(f.size > PED_VIDEO_MAX_MB*1024*1024){ toast(`Vídeo grande demais (máx. ${PED_VIDEO_MAX_MB} MB). Grave um vídeo mais curto.`, 4000); continue; }
+      const ext = (f.type.split('/')[1] || 'mp4').replace('quicktime','mov').replace('x-matroska','mkv');
+      pedForm.files.push({blob:f, mime:f.type, ext, tipo:'vídeo'});
+    } else {
+      const c = await comprimirImagem(f);
+      pedForm.files.push(c || {blob:f, mime:f.type || 'image/jpeg', ext:((f.type||'').split('/')[1] || 'jpg').replace('jpeg','jpg'), tipo:'foto'});
+    }
+  }
+  pedRenderFiles();
+}
+function pedRenderFiles(){
+  const el = document.getElementById('pd_files');
+  if(!el) return;
+  const maq = maquinaDoForm() || 'MÁQUINA', agora = Date.now();
+  let n = proximoNumeroMidia(maq, agora);
+  el.innerHTML = pedForm.files.map((f, i) => {
+    const nome = `${maq} - ${fmtDMA(agora)} - ${n++}.${f.ext}`;
+    return `<div class="photo-field is-done" style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:13px;">${f.tipo === 'vídeo' ? '🎬' : '📷'} ${escapeHtml(nome)} <span class="hint">(${Math.max(1, Math.round(f.blob.size/1024))} KB)</span></span><button class="btn btn-ghost btn-sm" onclick="pedRemoverFile(${i})">✕</button></div>`;
+  }).join('');
+}
+function pedRemoverFile(i){ pedForm.files.splice(i, 1); pedRenderFiles(); }
+async function enviarPedido(){
+  const v = id => (document.getElementById(id).value || '').trim();
+  const maquina = maquinaDoForm(), item = v('pd_item'), motivo = v('pd_motivo'), solic = v('pd_solic');
+  if(!maquina){ toast('Informe a máquina.'); return; }
+  if(!item){ toast('Informe o que precisa (peça ou serviço).'); return; }
+  if(motivo.length < 10){ toast('Explique o motivo da quebra ou da necessidade.'); return; }
+  if(!solic){ toast('Informe quem precisa da peça.'); return; }
+  const btn = document.getElementById('pd_enviar'); btn.disabled = true;
+  const agora = Date.now();
+  const pid = 'pc' + agora.toString(36) + Math.random().toString(36).slice(2,5);
+  let n = proximoNumeroMidia(maquina, agora);
+  const midia = [], blobs = [];
+  for(const f of pedForm.files){
+    const nome = `${maquina} - ${fmtDMA(agora)} - ${n++}.${f.ext}`;
+    midia.push({nome, tipo:f.tipo});
+    blobs.push({id:pid + ':' + nome, pid, maquina, nome, mime:f.mime, blob:f.blob, ts:agora});
+  }
+  let salvouMidia = true;
+  try{ for(const b of blobs) await idbPut(b); }catch(e){ salvouMidia = false; }
+  if(!salvouMidia && blobs.length){ btn.disabled = false; toast('Este aparelho não conseguiu guardar as fotos/vídeos. Tente de novo ou envie sem anexo.', 5000); return; }
+  try{ localStorage.setItem(PED_SOLIC_KEY, solic); }catch(e){}
+  const regpor = v('pd_regpor');
+  const p = {pid, maquina, item, qtd:v('pd_qtd'), motivo, urgencia:v('pd_urg'), horimetro:v('pd_horimetro'), solicitante:solic,
+    registradoPor:regpor || solic, criadoEm:agora, updatedAt:agora, status:'solicitado', cotacoes:[], escolhida:0, midia,
+    historico:[{quem:regpor || solic, acao:'abriu o pedido', ts:agora}]};
+  pedidos.push(p);
+  closeModal('modalPedido');
+  atualizarPendMidia();
+  publicarPedido(p, 'novo');
+  toast('Pedido enviado. A gerência vai cotar.');
+}
+
+/* ---------- Detalhe e ações da gerência ---------- */
+function pedAbrirDet(pid){
+  const p = pedidos.find(x => x.pid === pid);
+  if(!p) return;
+  pedAtual = pid;
+  const urg = URG[p.urgencia] || URG.planejada, st = PST[p.status] || PST.solicitado, ap = aprovadorAtual();
+  const e = escapeHtml;
+  const cots = (p.cotacoes||[]).map((c, i) => `<div style="margin-top:4px;">${i === p.escolhida && (p.status === 'aprovado' || p.status === 'comprado') ? '✔' : '•'} <b>${e(c.fornecedor)}</b> — ${ap ? fmtBRL(c.valor) : 'valor restrito à gerência'} — prazo ${e(c.prazo||'a combinar')}</div>`).join('');
+  const hist = (p.historico||[]).slice().reverse().map(h => `<div class="hint">${fmtDH(h.ts)} · ${e(h.quem)} ${e(h.acao)}</div>`).join('');
+  const midia = (p.midia||[]).map(m => `<div class="hint">${m.tipo === 'vídeo' ? '🎬' : '📷'} ${e(m.nome)} ${m.ok ? '✔ enviado' : '⏳ aguardando envio neste aparelho / já no SharePoint se foi enviado de outro'}</div>`).join('');
+  let acoes = '';
+  if(p.status !== 'comprado' && p.status !== 'cancelado'){
+    if(!ap) acoes += `<button class="btn btn-primary btn-block" onclick="entrarGerencia()">Entrar como gerência (cotar / aprovar)</button>`;
+    else {
+      if(p.status === 'solicitado' || p.status === 'cotado') acoes += `<button class="btn btn-primary btn-block" style="margin-bottom:8px;" onclick="pedFormCotar('${p.pid}')">${p.status === 'cotado' ? 'Refazer cotação' : '💲 Informar cotação'}</button>`;
+      if(p.status === 'cotado') acoes += `<button class="btn btn-secondary btn-block" style="margin-bottom:8px;" onclick="pedFormAprovar('${p.pid}')">✅ Aprovar</button>`;
+      if(p.status === 'aprovado') acoes += `<button class="btn btn-primary btn-block" style="margin-bottom:8px;" onclick="pedFormComprar('${p.pid}')">📦 Registrar compra</button>`;
+      acoes += `<button class="btn btn-ghost btn-block" onclick="pedFormCancelar('${p.pid}')">Cancelar pedido</button>`;
+    }
+  }
+  document.getElementById('pedTitle').textContent = `${p.maquina} — ${codigoPedido(p)}`;
+  document.getElementById('pedBody').innerHTML = `
+    <div class="ref-box"><b>${e(p.item)}</b>${p.qtd ? ' (' + e(p.qtd) + ')' : ''}<br>${urg.ico} ${urg.rot} · ${st.ico} <b>${st.rot}</b></div>
+    <div class="maint-card-meta" style="margin:0 0 10px;">
+      <b>Motivo:</b> ${e(p.motivo)}<br>
+      <b>Pedido por:</b> ${e(p.solicitante)}${p.registradoPor && p.registradoPor !== p.solicitante ? ' (registrado por ' + e(p.registradoPor) + ')' : ''} em ${fmtDH(p.criadoEm)}<br>
+      ${p.horimetro ? '<b>Horímetro:</b> ' + e(String(p.horimetro)) + '<br>' : ''}
+      ${p.status === 'solicitado' ? `<span class="hint-warn">⏳ Sem cotação há ${haTempo(p.criadoEm)}. Só pode ser aprovado depois de cotado.</span>` : ''}
+      ${cots ? '<br><b>Cotações:</b>' + cots : ''}
+      ${p.aprovadoPor ? '<br><b>Aprovado por:</b> ' + e(p.aprovadoPor) : ''}${p.compradoPor ? '<br><b>Compra registrada por:</b> ' + e(p.compradoPor) + (p.obsCompra ? ' — ' + e(p.obsCompra) : '') : ''}${p.cancelPor ? '<br><b>Cancelado por:</b> ' + e(p.cancelPor) + (p.cancelMotivo ? ' — ' + e(p.cancelMotivo) : '') : ''}
+    </div>
+    ${midia ? '<div class="photos-view-label">Anexos</div>' + midia : ''}
+    <div style="margin:14px 0 6px;">${acoes}</div>
+    ${hist ? '<div class="photos-view-label" style="margin-top:12px;">Histórico</div>' + hist : ''}`;
+  openModal('modalPedido');
+}
+function pedFormCotar(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  const lin = i => { const c = (p.cotacoes||[])[i] || {}; return `<div class="settings-block" style="margin-bottom:10px;"><h3>Cotação ${i+1}${i === 0 ? ' (obrigatória)' : ' (opcional)'}</h3>
+    <div class="field"><label>Fornecedor</label><input type="text" id="ct_f${i}" value="${escapeHtml(c.fornecedor||'')}" placeholder="ex: Casa do Trator"></div>
+    <div class="row2"><div class="field"><label>Valor total (R$)</label><input type="text" inputmode="decimal" id="ct_v${i}" value="${c.valor != null ? String(c.valor).replace('.', ',') : ''}" placeholder="ex: 1.250,00"></div>
+    <div class="field"><label>Prazo de entrega</label><input type="text" id="ct_p${i}" value="${escapeHtml(c.prazo||'')}" placeholder="ex: 3 dias"></div></div></div>`; };
+  document.getElementById('pedTitle').textContent = `Cotação — ${p.maquina}`;
+  document.getElementById('pedBody').innerHTML = `<div class="ref-box"><b>${escapeHtml(p.item)}</b>${p.qtd ? ' (' + escapeHtml(p.qtd) + ')' : ''}<br>Informe o preço <b>total</b> do pedido. Com mais de uma cotação, a aprovação sugere a mais barata.</div>
+    ${lin(0)}${lin(1)}${lin(2)}
+    <div class="actions-row"><button class="btn btn-primary" onclick="pedSalvarCotacao('${p.pid}')">Salvar cotação</button><button class="btn btn-ghost" onclick="pedAbrirDet('${p.pid}')">Voltar</button></div>`;
+}
+function pedSalvarCotacao(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  const cots = [];
+  for(let i = 0; i < 3; i++){
+    const f = document.getElementById('ct_f' + i).value.trim(), vr = parseBRL(document.getElementById('ct_v' + i).value), pz = document.getElementById('ct_p' + i).value.trim();
+    if(!f && isNaN(vr)) continue;
+    if(!f || isNaN(vr) || vr <= 0){ toast(`Cotação ${i+1}: informe fornecedor e valor.`); return; }
+    cots.push({fornecedor:f, valor:Math.round(vr*100)/100, prazo:pz});
+  }
+  if(!cots.length){ toast('Informe pelo menos uma cotação (fornecedor e valor).'); return; }
+  comAprovador(nome => {
+    p.cotacoes = cots;
+    p.escolhida = cots.reduce((m, c, i) => c.valor < cots[m].valor ? i : m, 0);
+    p.status = 'cotado'; p.cotadoPor = nome;
+    p.historico.push({quem:nome, acao:'informou a cotação', ts:Date.now()});
+    publicarPedido(p, 'cotado'); pedAbrirDet(pid); toast('Cotação salva.');
+  });
+}
+function pedFormAprovar(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  document.getElementById('pedTitle').textContent = `Aprovar — ${p.maquina}`;
+  document.getElementById('pedBody').innerHTML = `<div class="ref-box"><b>${escapeHtml(p.item)}</b>${p.qtd ? ' (' + escapeHtml(p.qtd) + ')' : ''}<br>Escolha a cotação aprovada:</div>
+    ${(p.cotacoes||[]).map((c, i) => `<label class="verified-row" style="border-top:none;"><input type="radio" name="ap_c" value="${i}" ${i === p.escolhida ? 'checked' : ''}> <span><b>${escapeHtml(c.fornecedor)}</b> — ${fmtBRL(c.valor)} — prazo ${escapeHtml(c.prazo||'a combinar')}${i === p.escolhida ? ' <span class="hint">(mais barata)</span>' : ''}</span></label>`).join('')}
+    <div class="actions-row" style="margin-top:12px;"><button class="btn btn-primary" onclick="pedConfirmarAprovar('${p.pid}')">Aprovar</button><button class="btn btn-ghost" onclick="pedAbrirDet('${p.pid}')">Voltar</button></div>`;
+}
+function pedConfirmarAprovar(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  const sel = document.querySelector('input[name=ap_c]:checked');
+  const idx = sel ? parseInt(sel.value, 10) : p.escolhida;
+  comAprovador(nome => {
+    p.escolhida = idx; p.status = 'aprovado'; p.aprovadoPor = nome; p.aprovadoEm = Date.now();
+    p.historico.push({quem:nome, acao:'aprovou a cotação de ' + p.cotacoes[idx].fornecedor, ts:Date.now()});
+    publicarPedido(p, 'aprovado'); pedAbrirDet(pid); toast('Pedido aprovado.');
+  });
+}
+function pedFormComprar(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  document.getElementById('pedTitle').textContent = `Registrar compra — ${p.maquina}`;
+  document.getElementById('pedBody').innerHTML = `<div class="ref-box"><b>${escapeHtml(p.item)}</b> — ${fmtBRL(pedValor(p))} (${escapeHtml(p.cotacoes[p.escolhida].fornecedor)})</div>
+    <div class="field"><label>Observação (nota fiscal, previsão de chegada…)</label><input type="text" id="cp_obs" placeholder="opcional"></div>
+    <div class="actions-row"><button class="btn btn-primary" onclick="pedConfirmarComprar('${p.pid}')">Confirmar compra</button><button class="btn btn-ghost" onclick="pedAbrirDet('${p.pid}')">Voltar</button></div>`;
+}
+function pedConfirmarComprar(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  const obs = document.getElementById('cp_obs').value.trim();
+  comAprovador(nome => {
+    p.status = 'comprado'; p.compradoPor = nome; p.compradoEm = Date.now(); p.obsCompra = obs;
+    p.historico.push({quem:nome, acao:'registrou a compra', ts:Date.now()});
+    publicarPedido(p, 'comprado'); pedAbrirDet(pid); toast('Compra registrada.');
+  });
+}
+function pedFormCancelar(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  document.getElementById('pedTitle').textContent = `Cancelar — ${p.maquina}`;
+  document.getElementById('pedBody').innerHTML = `<div class="ref-box">Cancelar o pedido de <b>${escapeHtml(p.item)}</b>?</div>
+    <div class="field"><label>Motivo do cancelamento</label><input type="text" id="cn_motivo" placeholder="ex: peça já tinha em estoque"></div>
+    <div class="actions-row"><button class="btn btn-danger" onclick="pedConfirmarCancelar('${p.pid}')">Cancelar pedido</button><button class="btn btn-ghost" onclick="pedAbrirDet('${p.pid}')">Voltar</button></div>`;
+}
+function pedConfirmarCancelar(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  const motivo = document.getElementById('cn_motivo').value.trim();
+  if(!motivo){ toast('Informe o motivo do cancelamento.'); return; }
+  comAprovador(nome => {
+    p.status = 'cancelado'; p.cancelPor = nome; p.cancelMotivo = motivo;
+    p.historico.push({quem:nome, acao:'cancelou o pedido: ' + motivo, ts:Date.now()});
+    publicarPedido(p, 'cancelado'); pedAbrirDet(pid); toast('Pedido cancelado.');
+  });
+}
+
+/* ---------- Relatório mensal por máquina (gerência) ---------- */
+function relatorioDados(mes){ // mes = 'AAAA-MM'
+  const por = new Map();
+  let total = 0, qtd = 0, semCot = 0, tempos = [];
+  pedidos.forEach(p => {
+    const t = p.aprovadoEm || 0;
+    if(p.status === 'solicitado') semCot++;
+    if(p.cotadoPor && (p.historico||[]).length){
+      const h = p.historico.find(x => /cotação/.test(x.acao)); if(h) tempos.push(h.ts - p.criadoEm);
+    }
+    if((p.status !== 'aprovado' && p.status !== 'comprado') || !t) return;
+    const d = new Date(t), m = `${d.getFullYear()}-${p2(d.getMonth()+1)}`;
+    if(m !== mes) return;
+    const v = pedValor(p); if(isNaN(v)) return;
+    const r = por.get(p.maquina) || {maquina:p.maquina, n:0, total:0, paradas:0};
+    r.n++; r.total += v; if(p.urgencia === 'parada') r.paradas++;
+    por.set(p.maquina, r); total += v; qtd++;
+  });
+  const linhas = Array.from(por.values()).sort((a,b) => b.total - a.total);
+  const mediaH = tempos.length ? tempos.reduce((a,b) => a+b, 0) / tempos.length / 3600000 : null;
+  return {linhas, total, qtd, semCot, mediaH};
+}
+function renderRelatorio(){
+  const inp = document.getElementById('rel_mes');
+  if(!inp.value) inp.value = `${new Date().getFullYear()}-${p2(new Date().getMonth()+1)}`;
+  const r = relatorioDados(inp.value);
+  document.getElementById('rel_corpo').innerHTML = r.linhas.length
+    ? `<table class="rel-tab"><tr><th>Máquina</th><th>Pedidos</th><th>Parada</th><th>Total</th></tr>${r.linhas.map(l => `<tr><td>${escapeHtml(l.maquina)}</td><td>${l.n}</td><td>${l.paradas}</td><td>${fmtBRL(l.total)}</td></tr>`).join('')}<tr class="tot"><td>Total</td><td>${r.qtd}</td><td></td><td>${fmtBRL(r.total)}</td></tr></table>`
+    : '<div class="empty" style="padding:14px;">Nenhum pedido aprovado neste mês.</div>';
+  document.getElementById('rel_info').textContent = `Aguardando cotação agora: ${r.semCot}${r.mediaH !== null ? ' · tempo médio até a cotação: ' + (r.mediaH < 48 ? r.mediaH.toFixed(1) + ' h' : (r.mediaH/24).toFixed(1) + ' d') : ''}`;
+}
+function copiarRelatorio(){
+  const mes = document.getElementById('rel_mes').value, r = relatorioDados(mes);
+  const [a, m] = mes.split('-');
+  const txt = `📊 Compras por máquina — ${m}/${a}\n` + (r.linhas.length ? r.linhas.map(l => `${l.maquina}: ${l.n} pedido(s)${l.paradas ? ' (' + l.paradas + ' com máquina parada)' : ''} — ${fmtBRL(l.total)}`).join('\n') + `\nTOTAL: ${r.qtd} pedido(s) — ${fmtBRL(r.total)}` : 'Nenhum pedido aprovado neste mês.') + `\nAguardando cotação: ${r.semCot}`;
+  (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Relatório copiado.')).catch(() => { prompt('Copie o relatório:', txt); });
+}
+
+/* ---------- Ligações com o resto do app ---------- */
+function comprasAbrir(){ renderCompras(); atualizarPendMidia(); comprasSync(); }
+try{ mergePedidos(); renderComprasBadge(); atualizarPendMidia(); }catch(e){}
+// Reenvio automático (a cada 45 s, só se sobrou algo pendente e o app está visível).
+setInterval(() => {
+  if(document.visibilityState !== 'visible') return;
+  if(loadPedQueue().length || loadPedMsgs().length || pedMidiaPendentes) comprasSync(true);
+}, 45000);
+
 </script>
 </body>
 </html>
