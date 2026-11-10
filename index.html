@@ -425,7 +425,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02c</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02d</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -933,7 +933,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02c';
+const APP_VERSION = 'v02d';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1587,6 +1587,7 @@ function maintSyncLegacy(cfg){
 // Salto máximo aceito entre o maior horímetro e o seguinte. Acima disso o valor mais alto é tratado como erro
 // de digitação (ex.: 36275 em vez de 14275) e NÃO vira o "horímetro atual" nem dispara aviso de manutenção.
 const HORIMETRO_SALTO_MAX = 300;
+const HORIMETRO_SALTO_REF = 2000; // acima da última manutenção cadastrada por mais que isso = erro de digitação
 function horimetroInfo(tratorNome, semPub){
   const vazio = {atual:null, fonte:'', suspeitos:[]};
   if(!tratorNome) return vazio;
@@ -1610,15 +1611,32 @@ function horimetroInfo(tratorNome, semPub){
   if(!c.length) return vazio;
   c.sort((x,y)=>y.v-x.v);
   const suspeitos = [];
-  // enquanto o valor mais alto estiver MUITO acima do próximo valor diferente, ele é suspeito
-  while(true){
+  // Referência: maior "horímetro da última manutenção" cadastrado para a máquina. Um horímetro MUITO acima dela
+  // (mais de HORIMETRO_SALTO_REF h) é erro de digitação, mesmo que seja o único valor conhecido
+  // (ex.: 24216 em vez de 2416, com a última troca em 2202).
+  const ref = horimetroRefManut(alvo);
+  // enquanto o valor mais alto estiver MUITO acima do próximo valor diferente (ou da última manutenção), ele é suspeito
+  while(c.length){
     const topo = c[0].v;
     const prox = c.find(x=>x.v !== topo);
-    if(!prox || topo - prox.v <= HORIMETRO_SALTO_MAX) break;
+    const salto = prox && topo - prox.v > HORIMETRO_SALTO_MAX;
+    const acimaRef = ref !== null && topo - ref > HORIMETRO_SALTO_REF;
+    if(!salto && !acimaRef) break;
     suspeitos.push({v:topo, fonte:c[0].fonte});
     for(let i=c.length-1;i>=0;i--) if(c[i].v === topo) c.splice(i,1);
   }
+  if(!c.length) return {atual:null, fonte:'', suspeitos};
   return {atual:c[0].v, fonte:c[0].fonte, suspeitos};
+}
+// Maior horímetro de "última manutenção" entre os itens cadastrados da máquina (null se não houver).
+function horimetroRefManut(alvoNorm){
+  try{
+    const cfg = (typeof maintConfigs !== 'undefined' ? maintConfigs : []).find(c => c.trator && normEquip(c.trator) === alvoNorm);
+    if(!cfg) return null;
+    let m = null;
+    maintItens(cfg).forEach(it=>{ const u = parseFloat(it.horimetroUltima); if(!isNaN(u) && (m === null || u > m)) m = u; });
+    return m;
+  }catch(e){ return null; }
 }
 // Maior horímetro conhecido (já sem valores suspeitos) para um trator/máquina.
 function getCurrentHorimetro(tratorNome, semPub){
