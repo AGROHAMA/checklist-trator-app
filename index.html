@@ -730,7 +730,7 @@
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v21';
+const APP_VERSION = 'v21.1';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1089,7 +1089,7 @@ function refreshShared(force){
   if(evRefreshing) return Promise.resolve();
   if(!force && !navigator.onLine){ try{ renderSharedPanel(); }catch(e){} return Promise.resolve(); }
   evRefreshing = true;
-  return fetchTimeout(settings.evListarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}, 40000)
+  return fetchTimeout(settings.evListarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}, 110000)
     .then(resp=>{ if(!resp.ok) throw new Error('http ' + resp.status); return resp.json(); })
     .then(data=>{
       const list = parseEvList(data);
