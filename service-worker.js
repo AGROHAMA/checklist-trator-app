@@ -6,7 +6,7 @@
    Ao publicar uma correção: basta subir os arquivos atualizados no GitHub Pages. Troque o número da
    versão abaixo (CACHE_VERSION) sempre que fizer uma alteração — isso garante que o cache antigo seja
    descartado e a versão nova seja usada em todos os aparelhos assim que eles tiverem internet. */
-const CACHE_VERSION = 'v19';
+const CACHE_VERSION = 'v21';
 const CACHE_NAME = `agrohama-checklist-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -141,14 +141,20 @@ self.addEventListener('fetch', (event) => {
   if (isNavigation) {
     // Tela principal: tenta sempre pegar a versão mais nova da internet primeiro (é isso que faz
     // a atualização acontecer sozinha). Se não tiver internet, usa a última versão salva no aparelho.
+    // Sinal fraco: se a internet não responder em 8 s, abre a versão salva no aparelho (antes ficava
+    // esperando e a tela não abria). Só guarda no cache respostas boas (nunca uma página de erro).
+    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), 8000) : null;
     event.respondWith(
-      fetch(req)
+      fetch(req, ctl ? { signal: ctl.signal } : undefined)
         .then((resp) => {
+          if (timer) clearTimeout(timer);
+          if (!resp || !resp.ok) throw new Error('resposta ruim');
           const copy = resp.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
           return resp;
         })
-        .catch(() => caches.match('./index.html').then((r) => r || caches.match('./')))
+        .catch(() => { if (timer) clearTimeout(timer); return caches.match('./index.html').then((r) => r || caches.match('./')); })
     );
     return;
   }

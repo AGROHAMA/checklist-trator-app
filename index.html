@@ -388,7 +388,7 @@
       <summary>Como funciona (toque para abrir)</summary>
       <div>
         Cadastre aqui cada trator/máquina. Dois recursos, independentes — pode usar um, outro ou os dois:<br><br>
-        <b>Manutenção por horímetro:</b> informe o intervalo (de quantas em quantas horas precisa trocar óleo/filtro) e o horímetro da última manutenção. O app calcula o horímetro atual pelos registros já lançados e avisa aqui no app e no Planner/Teams: amarelo faltando 20h, vermelho quando já venceu. Depois de fazer a manutenção de verdade, toque em "Manutenção feita agora" no card pra zerar a contagem.<br><br>
+        <b>Manutenção por horímetro:</b> informe o intervalo (de quantas em quantas horas precisa trocar óleo/filtro) e o horímetro da última manutenção. O app calcula o horímetro atual pelos registros já lançados e avisa aqui no app e no Planner/Teams: amarelo faltando 20h, vermelho quando já venceu. Depois de fazer a manutenção de verdade, toque em "Manutenção feita agora" no card pra zerar a contagem.<br><b>Compartilhado:</b> com o envio configurado em Ajustes, o que você cadastra aqui aparece em todos os aparelhos (alterações levam até 3 minutos para chegar) e o aviso de cada máquina é enviado uma vez só.<br><br>
         <b>Numeração do talão:</b> o número é do trator (não do operador), no formato <b>número da máquina + dia + mês + ano (2 dígitos) + hora + minuto</b>, sem nenhuma pontuação — ex: 972408260732 (trator 97, dia 24/08/26, às 07:32). É 100% automático: aparece sozinho ao selecionar o Trator na tela de Iniciar Operação, não dá pra editar à mão, e não precisa de internet nem de sincronizar entre aparelhos. Com o ano entrando (mesmo que só com 2 dígitos), a chance de dois talões do mesmo trator baterem o número é praticamente nula — só se repetiria em anos que terminam nos mesmos 2 dígitos (ex: 2026 e 2126). Informe o "Número de referência" da máquina (3 dígitos) uma única vez aqui — já vem sugerido pra tratores KH e veículos já conhecidos — e o app cuida do resto sozinho.
       </div>
     </details>
@@ -730,7 +730,7 @@
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1004,6 +1004,13 @@ function loadEvCache(){
 let evCache = loadEvCache();
 let sharedEvents = evCache.list;
 let evErro = false, evRefreshing = false;
+// fetch com tempo limite: sem isso, sinal fraco deixava o ↻ e a lista "carregando…" pra sempre.
+function fetchTimeout(url, opts, ms){
+  if(typeof AbortController === 'undefined') return fetch(url, opts);
+  const ctl = new AbortController();
+  const t = setTimeout(()=>ctl.abort(), ms || 30000);
+  return fetch(url, Object.assign({}, opts, {signal: ctl.signal})).finally(()=>clearTimeout(t));
+}
 function parseEvList(data){
   if(data && !Array.isArray(data) && Array.isArray(data.body)) data = data.body;
   if(!Array.isArray(data)) return [];
@@ -1051,7 +1058,7 @@ function sendCancels(force){
   if(!force && !navigator.onLine) return Promise.resolve([]);
   const ps = loadCancels().filter(c=>!syncInFlight.has('c:'+c.id)).map(c=>{
     syncInFlight.add('c:'+c.id);
-    return fetch(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({registro:c})})
+    return fetchTimeout(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({registro:c})}, 60000)
       .then(resp=>{
         if(resp.ok){
           saveCancels(loadCancels().filter(x=>x.id !== c.id));
@@ -1067,7 +1074,7 @@ function sendEventos(force){
   if(!force && !navigator.onLine) return Promise.resolve([]);
   const ps = eventosPendentes().filter(p=>!syncInFlight.has(p.key)).map(p=>{
     syncInFlight.add(p.key);
-    return fetch(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:p.body})
+    return fetchTimeout(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:p.body}, 60000)
       .then(resp=>{
         if(resp.ok){ p.rec[p.flag] = true; saveRecords(records); }
         else armBackgroundSync();
@@ -1082,7 +1089,7 @@ function refreshShared(force){
   if(evRefreshing) return Promise.resolve();
   if(!force && !navigator.onLine){ try{ renderSharedPanel(); }catch(e){} return Promise.resolve(); }
   evRefreshing = true;
-  return fetch(settings.evListarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+  return fetchTimeout(settings.evListarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}, 40000)
     .then(resp=>{ if(!resp.ok) throw new Error('http ' + resp.status); return resp.json(); })
     .then(data=>{
       const list = parseEvList(data);
@@ -1090,6 +1097,7 @@ function refreshShared(force){
       sharedEvents = list;
       evErro = false;
       try{ localStorage.setItem(EV_CACHE_KEY, JSON.stringify(evCache)); }catch(e){}
+      try{ mergeSharedMaint(); maintHousekeeping(); checkMaintenanceAlerts(); renderMaintenance(); }catch(e){}
     })
     .catch(()=>{ evErro = true; })
     .finally(()=>{ evRefreshing = false; try{ render(); }catch(e){} });
@@ -1327,7 +1335,7 @@ function saveMaint(list){
 let maintConfigs = loadMaint();
 
 // Maior horímetro conhecido para um trator/máquina, a partir dos registros de operação já lançados.
-function getCurrentHorimetro(tratorNome){
+function getCurrentHorimetro(tratorNome, semPub){
   if(!tratorNome) return null;
   const alvo = normEquip(tratorNome);
   let max = null;
@@ -1342,7 +1350,127 @@ function getCurrentHorimetro(tratorNome){
   });
   const sh = sharedMaxHorimetro(alvo);
   if(sh !== null && (max === null || sh > max)) max = sh;
+  if(!semPub){
+    const ph = maintPubHorimetro(alvo);
+    if(ph !== null && (max === null || ph > max)) max = ph;
+  }
   return max;
+}
+
+/* ===== Cadastro de manutenção COMPARTILHADO entre os aparelhos =====
+   Cada cadastro/edição/"manutenção feita" vira um arquivo pequeno m_<máquina>_<hora>.json na pasta de
+   eventos (mesmo fluxo "Gravar Evento"). Cada aparelho usa o registro MAIS RECENTE de cada máquina.
+   O registro leva também o último horímetro conhecido (os eventos de operação vão pro arquivo em 3 dias)
+   e as marcas de aviso já enviado (pra dois aparelhos não avisarem a mesma coisa duas vezes). */
+const MAINT_QUEUE_KEY = 'agrohama_maint_queue_v1';
+const MAINT_HEARTBEAT_MS = 30*24*3600*1000;   // republica a cada 30 dias (os arquivos m_ antigos vão pro arquivo em 60 dias)
+const MAINT_ATUAL_PASSO = 25;                 // republica o horímetro atual quando avançou 25 h desde a última publicação
+function loadMaintQueue(){ try{ return JSON.parse(localStorage.getItem(MAINT_QUEUE_KEY)) || []; }catch(e){ return []; } }
+function saveMaintQueue(l){ try{ localStorage.setItem(MAINT_QUEUE_KEY, JSON.stringify(l)); }catch(e){} }
+function maintSlug(t){ return normEquip(nomeParaManutencao(t)); }
+function maintLatestShared(alvo){
+  let best = null;
+  sharedEvents.forEach(e=>{
+    if(e && e.tipo === 'manutencao' && e.maquina && normEquip(e.maquina) === alvo && (!best || (e.criadoEm||0) > (best.criadoEm||0))) best = e;
+  });
+  return best;
+}
+function maintPubHorimetro(alvo){
+  const e = maintLatestShared(alvo);
+  if(!e || e.removido) return null;
+  const n = parseFloat(e.horimetroAtual);
+  return isNaN(n) ? null : n;
+}
+function maintRegistro(cfg, removido){
+  const alvo = normEquip(cfg.trator);
+  const real = getCurrentHorimetro(cfg.trator, true);
+  const prev = maintPubHorimetro(alvo);
+  const ts = Date.now();
+  return {
+    id: 'm_' + maintSlug(cfg.trator).replace(/[^a-z0-9]/g,'') + '_' + ts.toString(36),
+    tipo: 'manutencao',
+    maquina: nomeParaManutencao(cfg.trator),
+    intervaloHoras: cfg.intervaloHoras, horimetroUltimaManutencao: cfg.horimetroUltimaManutencao,
+    machineRef: cfg.machineRef || null,
+    horimetroAtual: real !== null ? real : prev,
+    alertSent: cfg.alertSent || {proximo:false, vencido:false},
+    removido: !!removido,
+    criadoEm: ts
+  };
+}
+// Publica o estado atual de um cadastro (entra numa fila local e é enviado quando houver sinal).
+function publishMaint(cfg, removido){
+  if(!settings.evGravarUrl) return Promise.resolve([]);
+  const reg = maintRegistro(cfg, removido);
+  cfg.updatedAt = reg.criadoEm;
+  cfg.lastPubAt = reg.criadoEm;
+  const alvo = normEquip(cfg.trator);
+  const q = loadMaintQueue().filter(x => normEquip(x.maquina) !== alvo);
+  q.push(reg);
+  saveMaintQueue(q);
+  if(!removido) saveMaint(maintConfigs);
+  return sendMaintQueue(true);
+}
+function sendMaintQueue(force){
+  if(!settings.evGravarUrl) return Promise.resolve([]);
+  if(!force && !navigator.onLine) return Promise.resolve([]);
+  const ps = loadMaintQueue().filter(r=>!syncInFlight.has('m:'+r.id)).map(r=>{
+    syncInFlight.add('m:'+r.id);
+    return fetchTimeout(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({registro:r})}, 60000)
+      .then(resp=>{
+        if(resp.ok){
+          saveMaintQueue(loadMaintQueue().filter(x=>x.id !== r.id));
+          sharedEvents = sharedEvents.concat([r]);
+        }
+        return resp.ok;
+      }).catch(()=>false).finally(()=>syncInFlight.delete('m:'+r.id));
+  });
+  return Promise.all(ps);
+}
+// Aplica o registro mais recente de cada máquina ao cadastro local (o mais novo vence).
+function mergeSharedMaint(){
+  const latest = new Map();
+  sharedEvents.concat(loadMaintQueue()).forEach(e=>{
+    if(!e || e.tipo !== 'manutencao' || !e.maquina) return;
+    const k = normEquip(e.maquina), cur = latest.get(k);
+    if(!cur || (e.criadoEm||0) > (cur.criadoEm||0)) latest.set(k, e);
+  });
+  let mudou = false;
+  latest.forEach((e,k)=>{
+    const ts = e.criadoEm || 0;
+    const cfg = maintConfigs.find(c => c.trator && normEquip(c.trator) === k);
+    if(e.removido){
+      if(cfg && ts > (cfg.updatedAt||0)){ maintConfigs = maintConfigs.filter(c=>c!==cfg); mudou = true; }
+      return;
+    }
+    const campos = {trator:e.maquina, intervaloHoras:e.intervaloHoras, horimetroUltimaManutencao:e.horimetroUltimaManutencao,
+      machineRef:e.machineRef || null, alertSent:{proximo:!!(e.alertSent&&e.alertSent.proximo), vencido:!!(e.alertSent&&e.alertSent.vencido)}, updatedAt:ts};
+    if(!cfg){ maintConfigs.push(Object.assign({id:uid(), createdAt:ts}, campos)); mudou = true; }
+    else if(ts > (cfg.updatedAt||0)){ Object.assign(cfg, campos); mudou = true; }
+  });
+  if(mudou) saveMaint(maintConfigs);
+  return mudou;
+}
+// Publica o que ainda não está no compartilhado, e renova registros antigos / horímetro que andou.
+function maintHousekeeping(){
+  if(!settings.evGravarUrl || !navigator.onLine) return;
+  if(!evCache.t || evErro) return; // só depois de ter lido a lista de verdade (senão publicaria em duplicidade)
+  const fila = loadMaintQueue();
+  maintConfigs.forEach(cfg=>{
+    if(!cfg.trator) return;
+    const alvo = normEquip(cfg.trator);
+    if(fila.some(x=>normEquip(x.maquina) === alvo)) return;
+    if(cfg.lastPubAt && Date.now() - cfg.lastPubAt < 15*60000) return; // acabou de publicar: dá tempo da lista compartilhada refletir
+    const pub = maintLatestShared(alvo);
+    let precisa = false;
+    if(!pub || pub.removido) precisa = true;                                   // ainda não compartilhado
+    else {
+      if(Date.now() - (pub.criadoEm||0) > MAINT_HEARTBEAT_MS) precisa = true;  // renovação mensal
+      const real = getCurrentHorimetro(cfg.trator, true), ph = parseFloat(pub.horimetroAtual);
+      if(real !== null && (isNaN(ph) || real - ph >= MAINT_ATUAL_PASSO)) precisa = true;
+    }
+    if(precisa) publishMaint(cfg, false);
+  });
 }
 
 function computeMaintStatus(cfg){
@@ -1479,17 +1607,20 @@ function saveMaintConfig(){
     });
   }
   saveMaint(maintConfigs);
+  publishMaint(findMaintConfig(trator), false);
   resetMaintForm();
   renderMaintenance();
   render();
-  toast('Equipamento salvo.');
+  toast(settings.evGravarUrl ? 'Equipamento salvo e compartilhado.' : 'Equipamento salvo neste aparelho.');
   checkMaintenanceAlerts();
 }
 
 function deleteMaintConfig(id){
   if(!confirm('Remover este equipamento do controle de manutenção?')) return;
+  const alvoCfg = maintConfigs.find(c=>c.id===id);
   maintConfigs = maintConfigs.filter(c=>c.id!==id);
   saveMaint(maintConfigs);
+  if(alvoCfg) publishMaint(alvoCfg, true);
   renderMaintenance();
   render();
 }
@@ -1507,6 +1638,7 @@ function markMaintDone(id){
   cfg.alertSent = {proximo:false, vencido:false};
   cfg.updatedAt = Date.now();
   saveMaint(maintConfigs);
+  publishMaint(cfg, false);
   renderMaintenance();
   render();
   toast('Manutenção registrada. Contagem zerada.');
@@ -1607,6 +1739,7 @@ function attemptSyncMaintenance(cfg, info, force){
       cfg.alertSent[vencido ? 'vencido' : 'proximo'] = true;
       if(vencido) cfg.alertSent.proximo = true;
       saveMaint(maintConfigs);
+      publishMaint(cfg, false);
       // Sem isso, o contador de "pendências" no topo da tela fica desatualizado até a próxima
       // ação do usuário — mesmo depois do envio ter sido confirmado com sucesso em segundo plano.
       updatePendingSyncButton();
@@ -1617,19 +1750,25 @@ function attemptSyncMaintenance(cfg, info, force){
 
 /* Mesmo esquema do alerta de manutenção, mas para o talão físico estar acabando/esgotado. */
 function checkMaintenanceAlerts(){
+  // Com a lista compartilhada configurada, só envia aviso se os dados compartilhados são recentes (≤10 min):
+  // assim um aparelho com dados velhos não repete um aviso que outro já mandou.
+  const dadosFrescos = !settings.evListarUrl || (evCache.t && !evErro && Date.now() - evCache.t < 10*60000);
   maintConfigs.forEach(cfg=>{
     if(!cfg.alertSent) cfg.alertSent = {proximo:false, vencido:false};
     const info = computeMaintStatus(cfg);
-    if(info.status === 'ok' || info.status === 'sem_dados'){
+    if(info.status === 'sem_dados'){
+      /* sem horímetro conhecido NESTE aparelho: não zera as marcas de aviso (antes zerava e o aviso saía de novo) */
+    } else if(info.status === 'ok'){
       if(cfg.alertSent.proximo || cfg.alertSent.vencido){
         cfg.alertSent = {proximo:false, vencido:false};
         saveMaint(maintConfigs);
+        publishMaint(cfg, false);
       }
     } else {
-      if(info.status === 'proximo' && !cfg.alertSent.proximo){
+      if(dadosFrescos && info.status === 'proximo' && !cfg.alertSent.proximo){
         attemptSyncMaintenance(cfg, info);
       }
-      if(info.status === 'vencido' && !cfg.alertSent.vencido){
+      if(dadosFrescos && info.status === 'vencido' && !cfg.alertSent.vencido){
         attemptSyncMaintenance(cfg, info);
       }
     }
@@ -2133,7 +2272,11 @@ function resolveProblem(id){
 }
 
 function deleteRecord(id){
-  if(!confirm('Excluir este registro deste aparelho?')) return;
+  const _r = records.find(r=>r.id===id);
+  const msgExcluir = (_r && _r.synced)
+    ? 'Este registro JÁ FOI ENVIADO ao Planner/Teams. Excluir aqui apaga só a cópia deste aparelho: o card e a mensagem lá continuam (apague lá também, se precisar).\n\nExcluir mesmo assim?'
+    : 'Excluir este registro deste aparelho?';
+  if(!confirm(msgExcluir)) return;
   debugLog('registro_excluido', {id});
   const excl = records.find(r=>r.id===id);
   if(excl && excl.compart && excl.status === 'andamento' && settings.evGravarUrl) queueCancel(evCancelamento('i_'+id, excl.tractor, 'excluída no aparelho'));
@@ -2868,7 +3011,11 @@ function importData(evt){
   evt.target.value = '';
 }
 function clearAll(){
-  if(!confirm('Isso vai apagar TODOS os registros salvos neste aparelho. Tem certeza?')) return;
+  const _env = records.filter(r=>r && r.synced).length, _aberto = records.filter(r=>r && r.status === 'andamento').length;
+  let _msg = 'Isso vai apagar TODOS os registros salvos neste aparelho. Tem certeza?';
+  if(_env) _msg += '\n\n' + _env + ' deles já foram enviados ao Planner/Teams e os cards lá continuam.';
+  if(_aberto) _msg += '\n\n⚠️ ' + _aberto + ' operação(ões) EM ANDAMENTO serão apagadas daqui (a máquina continuaria aparecendo em operação no painel).';
+  if(!confirm(_msg)) return;
   debugLog('limpar_tudo', {qtdAntes: records.length});
   records = [];
   saveRecords(records);
@@ -2960,6 +3107,7 @@ if(records.some(r => r && r.status === 'andamento' && r.compart === undefined)){
   saveRecords(records);
 }
 render();
+try{ mergeSharedMaint(); }catch(e){}
 checkMaintenanceAlerts();
 updatePendingSyncButton();
 // Tenta enviar sozinho o que ficou pendente de uma sessão anterior assim que o app abre (e não só
@@ -3003,6 +3151,12 @@ setInterval(() => {
    instala em segundo plano e recarrega a tela uma vez pra aplicar — sem precisar desinstalar/
    reinstalar nada no celular. Sem internet, continua funcionando normalmente com a última versão
    que já tinha sido baixada. */
+// Só recarrega quando nenhuma tela de preenchimento está aberta (antes, a atualização podia apagar o que a pessoa estava digitando).
+function recarregarQuandoSeguro(){
+  const aberto = ()=> !!document.querySelector('.modal-overlay.open');
+  if(!aberto()){ setTimeout(()=>window.location.reload(), 800); return; }
+  const t = setInterval(()=>{ if(!aberto()){ clearInterval(t); setTimeout(()=>window.location.reload(), 800); } }, 3000);
+}
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js').then(reg => {
@@ -3012,7 +3166,7 @@ if('serviceWorker' in navigator){
         newWorker.addEventListener('statechange', () => {
           if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
             toast('Nova versão do app encontrada — atualizando...');
-            setTimeout(() => window.location.reload(), 1200);
+            recarregarQuandoSeguro();
           }
         });
       });
@@ -3027,7 +3181,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if(swRefreshing) return;
     swRefreshing = true;
-    window.location.reload();
+    recarregarQuandoSeguro();
   });
 }
 </script>
