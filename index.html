@@ -425,7 +425,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02d</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02e</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -933,7 +933,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02d';
+const APP_VERSION = 'v02e';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1670,7 +1670,10 @@ function maintPubHorimetro(alvo){
 function maintRegistro(cfg, removido){
   const alvo = normEquip(cfg.trator);
   const real = getCurrentHorimetro(cfg.trator, true);
-  const prev = maintPubHorimetro(alvo);
+  let prev = maintPubHorimetro(alvo);
+  // não republica um horímetro publicado antes que hoje é considerado erro (muito acima da última manutenção)
+  const refM = horimetroRefManut(alvo);
+  if(prev !== null && refM !== null && prev - refM > HORIMETRO_SALTO_REF) prev = null;
   const ts = Date.now();
   return {
     id: 'm_' + maintSlug(cfg.trator).replace(/[^a-z0-9]/g,'') + '_' + ts.toString(36),
@@ -1756,6 +1759,8 @@ function maintHousekeeping(){
       if(Date.now() - (pub.criadoEm||0) > MAINT_HEARTBEAT_MS) precisa = true;  // renovação mensal
       const real = getCurrentHorimetro(cfg.trator, true), ph = parseFloat(pub.horimetroAtual);
       if(real !== null && (isNaN(ph) || real - ph >= MAINT_ATUAL_PASSO || ph - real > HORIMETRO_SALTO_MAX)) precisa = true;
+      const refM = horimetroRefManut(alvo);
+      if(!isNaN(ph) && refM !== null && ph - refM > HORIMETRO_SALTO_REF) precisa = true; // valor publicado absurdo: republica sem ele
     }
     if(precisa) publishMaint(cfg, false);
   });
