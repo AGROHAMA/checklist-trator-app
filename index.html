@@ -7,7 +7,7 @@
 
 <!-- PWA: instalação na tela inicial e ícone do app -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#183a1d">
+<meta name="theme-color" content="#00a76a">
 <link rel="icon" type="image/x-icon" href="icons/favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -18,25 +18,29 @@
 
 <style>
   :root{
-    --green-900:#183a1d;
-    --green-700:#276b32;
-    --green-600:#2f8a3c;
-    --green-500:#3aa64a;
-    --green-100:#e7f5ea;
-    --amber-500:#c9891f;
-    --amber-700:#8a5a0b;
-    --amber-100:#fbf0dd;
-    --red-500:#b3402c;
-    --red-100:#fbe7e2;
-    --gray-900:#1f2421;
-    --gray-700:#4b544d;
-    --gray-600:#5c665e;
-    --gray-400:#8a938c;
-    --gray-200:#dfe6e1;
-    --gray-100:#f3f6f4;
+    --green-900:#06382f;
+    --green-700:#00855a;
+    --green-600:#00a36f;
+    --green-500:#00c896;
+    --green-100:#dcfaf0;
+    --amber-500:#ff9a1f;
+    --amber-700:#a85a00;
+    --amber-100:#fff1d6;
+    --red-500:#e6254b;
+    --red-100:#ffe3e9;
+    --gray-900:#10211d;
+    --gray-700:#3d5650;
+    --gray-600:#4f6760;
+    --gray-400:#86a099;
+    --gray-200:#d3eae2;
+    --gray-100:#effaf6;
     --white:#ffffff;
-    --radius:12px;
-    --shadow:0 2px 10px rgba(20,40,25,0.08);
+    --blue-500:#2f6bff;
+    --grad-main:linear-gradient(135deg,#00b26b 0%,#00b8a9 55%,#2f8bff 100%);
+    --grad-btn:linear-gradient(135deg,#009a5a 0%,#00a3a0 60%,#1f7bef 100%);
+    --radius:16px;
+    --shadow:0 6px 22px rgba(0,140,110,0.13);
+    --glow:0 6px 18px rgba(0,170,140,0.35);
   }
   *{box-sizing:border-box;}
   body{
@@ -313,13 +317,72 @@
   .pin-key{font-size:20px;font-weight:700;padding:14px 0;border-radius:10px;border:1px solid var(--gray-200);background:var(--white);cursor:pointer;}
   .pin-key:active{background:var(--gray-200);}
   .pin-error{color:var(--red-500);text-align:center;font-size:12.5px;min-height:18px;margin-top:6px;}
+
+  /* ===== v01 · visual vivo e futurista (claro com degradês) ===== */
+  body{
+    background:radial-gradient(900px 420px at 0% -5%,rgba(0,200,150,.22),transparent 60%),
+               radial-gradient(800px 420px at 100% 0%,rgba(47,107,255,.16),transparent 60%),var(--gray-100);
+    background-attachment:fixed;
+  }
+  header{
+    background:radial-gradient(circle at 88% 15%,rgba(255,255,255,.30),transparent 45%),var(--grad-main);
+    border-radius:0 0 22px 22px;
+    box-shadow:0 8px 28px rgba(0,150,130,.35);
+  }
+  header h1{letter-spacing:.01em;text-shadow:0 1px 8px rgba(0,60,50,.25);}
+  header .sub{opacity:.95;}
+  .ver-chip{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.5);font-size:10.5px;font-weight:700;letter-spacing:.06em;vertical-align:middle;}
+  .status-online{background:rgba(255,255,255,.24);color:#effff8;border:1px solid rgba(255,255,255,.45);}
+  .status-offline{background:rgba(255,154,31,.40);color:#fff6e3;border:1px solid rgba(255,225,170,.7);}
+  .btn{border-radius:14px;letter-spacing:.01em;}
+  .btn-primary{background:var(--grad-btn);box-shadow:var(--glow);}
+  .btn-primary:active{box-shadow:0 2px 8px rgba(0,170,140,.3);}
+  .btn-secondary{background-image:linear-gradient(#fff,#fff),var(--grad-main);background-origin:border-box;background-clip:padding-box,border-box;border:1.5px solid transparent;color:var(--green-700);}
+  .btn-ghost{border-color:var(--gray-200);background:rgba(255,255,255,.6);}
+  .btn-danger{background:linear-gradient(135deg,#e6254b,#ff6a3d);box-shadow:0 6px 16px rgba(230,37,75,.3);}
+  .card,.maint-card,.week-col,.live-panel{border:1px solid rgba(0,180,140,.18);}
+  .card{position:relative;overflow:hidden;}
+  .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad-main);}
+  .maint-card.st-vencido{border:1.5px solid var(--red-500);box-shadow:0 6px 22px rgba(230,37,75,.18);}
+  .maint-card.st-proximo{border:1.5px solid var(--amber-500);box-shadow:0 6px 22px rgba(255,154,31,.20);}
+  .badge-andamento{background:linear-gradient(135deg,#ffe7b0,#ffc766);color:#6b3d00;}
+  .badge-concluido{background:linear-gradient(135deg,#c3f7e1,#9aeaff);color:#006244;}
+  .chip{border-radius:999px;border-color:var(--gray-200);}
+  .filter-row{padding:4px 4px 12px;}
+  .chip.active{background:var(--grad-btn);border-color:transparent;color:#fff;box-shadow:var(--glow);}
+  .maint-status-pill.st-ok{background:linear-gradient(135deg,#c3f7e1,#9aeaff);color:#006244;}
+  .maint-status-pill.st-proximo{background:linear-gradient(135deg,#ffe7b0,#ffc766);color:#6b3d00;}
+  .maint-status-pill.st-vencido{background:linear-gradient(135deg,#ffd0da,#ffb3c2);color:#a3001f;}
+  .maint-alert.is-proximo{background:linear-gradient(135deg,#fff5dc,#ffe3b0);}
+  .maint-alert.is-vencido{background:linear-gradient(135deg,#ffe8ee,#ffd0da);}
+  footer.tabs{background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:none;border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(0,140,110,.16);}
+  footer.tabs button{position:relative;}
+  footer.tabs button.active{color:var(--green-700);}
+  footer.tabs button.active .icon{filter:drop-shadow(0 2px 6px rgba(0,190,150,.55));transform:translateY(-1px) scale(1.12);}
+  footer.tabs button.active::before{content:'';position:absolute;top:0;left:50%;width:30px;margin-left:-15px;height:3px;border-radius:0 0 4px 4px;background:var(--grad-main);}
+  input:focus,textarea:focus,select:focus{border-color:var(--green-500);box-shadow:0 0 0 3px rgba(0,200,150,.20);}
+  .modal{border-radius:24px 24px 0 0;background:linear-gradient(180deg,#eafff8 0,#fff 90px);box-shadow:0 -10px 40px rgba(0,120,110,.25);}
+  input:checked + .slider{background:var(--grad-main);}
+  .toast{background:linear-gradient(135deg,#06382f,#0a5a56);box-shadow:0 8px 24px rgba(0,90,80,.35);}
+  .week-col.is-today{border:2px solid var(--green-500);box-shadow:var(--glow);}
+  .live-panel{border-left:5px solid var(--green-500);}
+  .pin-key{border-radius:14px;border:1px solid var(--gray-200);font-size:21px;}
+  .pin-key:active{background:var(--grad-main);color:#fff;border-color:transparent;}
+  .pin-dot.filled{background:var(--grad-main);border-color:transparent;box-shadow:0 0 8px rgba(0,190,150,.6);}
+  details.help summary{color:var(--green-700);}
+
+  /* Modo administrador (cadastro de manutenção) */
+  .admin-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-radius:14px;padding:11px 13px;margin-bottom:14px;font-size:13px;line-height:1.4;background:linear-gradient(135deg,#eaf3ff,#e3fff6);border:1.5px solid rgba(47,107,255,.35);color:var(--gray-900);}
+  .admin-bar.is-on{background:linear-gradient(135deg,#dcfaf0,#d7f1ff);border-color:var(--green-500);}
+  .admin-bar span{flex:1 1 200px;}
+  .admin-bar .btn{flex:none;}
 </style>
 </head>
 <body>
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção</div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v01</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -387,12 +450,15 @@
     <details class="help">
       <summary>Como funciona (toque para abrir)</summary>
       <div>
-        Cadastre aqui cada trator/máquina. Dois recursos, independentes — pode usar um, outro ou os dois:<br><br>
+        <b>Quem cadastra:</b> todos podem ver os equipamentos e os avisos; cadastrar, editar, remover e marcar "Feita agora" só o administrador, com a senha dele (botão "Entrar como administrador").<br><br>Cadastre aqui cada trator/máquina. Dois recursos, independentes — pode usar um, outro ou os dois:<br><br>
         <b>Manutenção por horímetro:</b> cada máquina tem uma lista de itens, cada um com seu intervalo e o horímetro da última troca — por padrão: <b>Periódica</b> (óleo do motor + filtros de óleo e de combustível) a cada 300 h, <b>Filtro de ar</b> a cada 600 h e <b>Óleo hidráulico</b> a cada 800 h (dá pra ajustar, adicionar ou remover itens em cada máquina). O app calcula o horímetro atual pelos registros já lançados e avisa aqui no app e no Planner/Teams, item por item: amarelo quando está perto (20 h antes na periódica, 30 h no filtro de ar, 40 h no hidráulico), vermelho quando venceu. Depois de fazer a troca de verdade, toque em "Feita agora" no item certo pra zerar só a contagem dele.<br><b>GPS:</b> nas máquinas com GPS, informe a data de vencimento da atualização. O app avisa 30 dias antes (amarelo) e fica vermelho quando vencer; depois de renovar, toque em "GPS atualizado" e informe a nova data.<br><b>Compartilhado:</b> com o envio configurado em Ajustes, o que você cadastra aqui aparece em todos os aparelhos (alterações levam até 3 minutos para chegar) e o aviso de cada máquina é enviado uma vez só.<br><br>
         <b>Numeração do talão:</b> o número é do trator (não do operador), no formato <b>número da máquina + dia + mês + ano (2 dígitos) + hora + minuto</b>, sem nenhuma pontuação — ex: 972408260732 (trator 97, dia 24/08/26, às 07:32). É 100% automático: aparece sozinho ao selecionar o Trator na tela de Iniciar Operação, não dá pra editar à mão, e não precisa de internet nem de sincronizar entre aparelhos. Com o ano entrando (mesmo que só com 2 dígitos), a chance de dois talões do mesmo trator baterem o número é praticamente nula — só se repetiria em anos que terminam nos mesmos 2 dígitos (ex: 2026 e 2126). Informe o "Número de referência" da máquina (3 dígitos) uma única vez aqui — já vem sugerido pra tratores KH e veículos já conhecidos — e o app cuida do resto sozinho.
       </div>
     </details>
 
+    <div id="adminBar"></div>
+
+    <div id="maintFormWrap" style="display:none;">
     <div class="settings-block">
       <h3 id="maintFormTitle">Cadastrar equipamento</h3>
       <input type="hidden" id="maint_editId">
@@ -424,6 +490,7 @@
         <button class="btn btn-primary" style="flex:1;" onclick="saveMaintConfig()">Salvar equipamento</button>
         <button class="btn btn-ghost" id="maint_cancelBtn" style="display:none;" onclick="resetMaintForm()">Cancelar edição</button>
       </div>
+    </div>
     </div>
 
     <div class="settings-block">
@@ -732,7 +799,7 @@
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v24';
+const APP_VERSION = 'v01';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1587,6 +1654,7 @@ function pioStatus(a, b){
 }
 // "GPS atualizado": pede a nova data de vencimento e compartilha.
 function renovarGps(id){
+  if(!isAdmin()){ pedirAdmin(()=>renovarGps(id)); return; } adminTocar();
   const cfg = maintConfigs.find(c=>c.id===id);
   if(!cfg) return;
   const txt = prompt(`Nova data de vencimento do GPS de ${cfg.trator} (dd/mm/aaaa):`);
@@ -1672,12 +1740,14 @@ function lerMaintItemRows(){
   }));
 }
 function addMaintItemRow(){
+  if(!isAdmin()){ pedirAdmin(()=>addMaintItemRow()); return; } adminTocar();
   const el = document.getElementById('maint_itens');
   if(!el) return;
   el.insertAdjacentHTML('beforeend', maintItemRowHtml({id:itemUid(), nome:'', intervaloHoras:'', horimetroUltima:''}));
 }
 // Acrescenta os itens do padrão que ainda não estão na lista (não mexe nos que já existem).
 function fillMaintPadrao(){
+  if(!isAdmin()){ pedirAdmin(()=>fillMaintPadrao()); return; } adminTocar();
   const atuais = lerMaintItemRows();
   const tem = id => atuais.some(x => x.id === id);
   MAINT_PADRAO.forEach(p=>{ if(!tem(p.id)) atuais.push({id:p.id, nome:p.nome, intervaloHoras:p.intervaloHoras, horimetroUltima:''}); });
@@ -1706,6 +1776,7 @@ function onMaintTractorInput(value){
 }
 
 function editMaintConfig(id){
+  if(!isAdmin()){ pedirAdmin(()=>editMaintConfig(id)); return; } adminTocar();
   const cfg = maintConfigs.find(c=>c.id===id);
   if(!cfg) return;
   document.getElementById('maint_editId').value = cfg.id;
@@ -1719,6 +1790,7 @@ function editMaintConfig(id){
 }
 
 function saveMaintConfig(){
+  if(!isAdmin()){ pedirAdmin(()=>saveMaintConfig()); return; } adminTocar();
   const trator = document.getElementById('maint_trator').value.trim();
   const machineRefRaw = document.getElementById('maint_machineRef').value.trim();
   const gpsVencimento = document.getElementById('maint_gpsVenc').value || '';
@@ -1731,7 +1803,7 @@ function saveMaintConfig(){
     return;
   }
   const machineRef = machineRefRaw ? machineRefRaw.padStart(3, '0') : null;
-  if(machineRef && maintConfigs.some(c => c.machineRef === machineRef && normEquip(c.trator) !== normEquip(trator))){
+  if(machineRef && maintConfigs.some(c => c.machineRef === machineRef && normEquip(c.trator) !== normEquip(trator) && c.id !== document.getElementById('maint_editId').value)){
     toast(`Esse número de referência (${machineRef}) já está em uso por outro equipamento — escolha outro, senão os talões vão colidir.`);
     return;
   }
@@ -1778,6 +1850,7 @@ function saveMaintConfig(){
 }
 
 function deleteMaintConfig(id){
+  if(!isAdmin()){ pedirAdmin(()=>deleteMaintConfig(id)); return; } adminTocar();
   if(!confirm('Remover este equipamento do controle de manutenção?')) return;
   const alvoCfg = maintConfigs.find(c=>c.id===id);
   maintConfigs = maintConfigs.filter(c=>c.id!==id);
@@ -1788,6 +1861,7 @@ function deleteMaintConfig(id){
 }
 
 function markMaintDone(id, itemId){
+  if(!isAdmin()){ pedirAdmin(()=>markMaintDone(id,itemId)); return; } adminTocar();
   const cfg = maintConfigs.find(c=>c.id===id);
   if(!cfg) return;
   const it = maintItens(cfg).find(x=>x.id===itemId);
@@ -1832,7 +1906,7 @@ function renderMaintenance(){
       return `<div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--gray-200,#ddd);">
         ${emoji[x.status]} <b>${escapeHtml(x.item.nome)}</b><br>
         <span style="font-size:.92em;">A cada <b>${escapeHtml(String(x.item.intervaloHoras))} h</b> · última em <b>${escapeHtml(String(x.item.horimetroUltima||'—'))}</b> · próxima em <b>${x.limite === null ? '—' : x.limite}</b> (${rt})</span><br>
-        <button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="markMaintDone('${cfg.id}','${x.item.id}')">Feita agora</button>
+        ${isAdmin() ? `<button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="markMaintDone('${cfg.id}','${x.item.id}')">Feita agora</button>` : ''}
       </div>`;
     }).join('');
     const manutencaoHtml = temManutencaoConfigurada
@@ -1854,11 +1928,11 @@ function renderMaintenance(){
       <div class="maint-card-meta">
         ${manutencaoHtml}${gpsHtml}${numeracaoHtml}
       </div>
-      <div class="maint-card-actions">
+      ${isAdmin() ? `<div class="maint-card-actions">
         <button class="btn btn-secondary btn-sm" onclick="editMaintConfig('${cfg.id}')">Editar</button>
         ${gps ? `<button class="btn btn-secondary btn-sm" onclick="renovarGps('${cfg.id}')">GPS atualizado</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="deleteMaintConfig('${cfg.id}')">Remover</button>
-      </div>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -2925,6 +2999,7 @@ document.getElementById('filterRow').addEventListener('click', (e)=>{
 });
 
 function switchTab(tab){
+  if(tab !== 'maintenance' && isAdmin()){ adminUntil = 0; clearTimeout(adminTimer); } // sair da aba encerra o modo administrador
   document.getElementById('viewHome').style.display = tab==='home' ? 'block' : 'none';
   document.getElementById('viewWeek').style.display = tab==='week' ? 'block' : 'none';
   document.getElementById('viewMaintenance').style.display = tab==='maintenance' ? 'block' : 'none';
@@ -2946,6 +3021,7 @@ function switchTab(tab){
   }
   if(tab==='maintenance'){
     resetMaintForm();
+    renderAdminUi();
     renderMaintenance();
   }
 }
@@ -2962,7 +3038,77 @@ function saveSettings(){
   updatePendingSyncButton();
 }
 
-/* ===================== Senha (PIN) de acesso às abas Manutenção/Ajustes ===================== */
+/* ===================== Modo administrador (cadastro de manutenção) ===================== */
+// Todos os aparelhos abrem "somente visualização". Só quem digitar a senha do administrador (4 dígitos)
+// consegue cadastrar/editar/remover equipamentos e marcar manutenção feita. O app guarda apenas o
+// "hash" da senha (não a senha em si). É um bloqueio de uso para evitar mexida sem querer pelos
+// operadores — não é segurança de nível bancário.
+const ADMIN_PIN_HASH = '3d868cf7701567159a2b056ec1cfe063edc557f0459942bc56b26d10a39a3ada';
+const ADMIN_SESSAO_MS = 10*60*1000;
+let adminUntil = 0, adminTimer = null, adminFalhas = 0, adminBloqueadoAte = 0, adminCallback = null;
+function sha256hex(ascii){
+  const rr=(v,a)=>(v>>>a)|(v<<(32-a)), mp=Math.pow, mw=mp(2,32);
+  let result='';
+  const words=[], bitLen=ascii.length*8;
+  const hash=[], k=[]; let pc=0; const comp={};
+  for(let c=2;pc<64;c++){
+    if(!comp[c]){
+      for(let i=0;i<313;i+=c) comp[i]=c;
+      hash[pc]=(mp(c,.5)*mw)|0;
+      k[pc++]=(mp(c,1/3)*mw)|0;
+    }
+  }
+  ascii+='\x80';
+  while(ascii.length%64-56) ascii+='\x00';
+  for(let i=0;i<ascii.length;i++){ const j=ascii.charCodeAt(i); words[i>>2]|=j<<((3-i)%4)*8; }
+  words[words.length]=((bitLen/mw)|0);
+  words[words.length]=bitLen;
+  let h=hash.slice(0,8);
+  for(let j=0;j<words.length;){
+    const w=words.slice(j,j+=16); const old=h; h=h.slice(0,8);
+    for(let i=0;i<64;i++){
+      const w15=w[i-15], w2=w[i-2], a=h[0], e=h[4];
+      const t1=h[7]+(rr(e,6)^rr(e,11)^rr(e,25))+((e&h[5])^((~e)&h[6]))+k[i]+(w[i]=(i<16)?w[i]:(w[i-16]+(rr(w15,7)^rr(w15,18)^(w15>>>3))+w[i-7]+(rr(w2,17)^rr(w2,19)^(w2>>>10))|0));
+      const t2=(rr(a,2)^rr(a,13)^rr(a,22))+((a&h[1])^(a&h[2])^(h[1]&h[2]));
+      h=[(t1+t2)|0].concat(h);
+      h[4]=(h[4]+t1)|0;
+    }
+    for(let i=0;i<8;i++) h[i]=(h[i]+old[i])|0;
+  }
+  for(let i=0;i<8;i++) for(let j=3;j+1;j--){ const b=(h[i]>>(j*8))&255; result+=((b<16)?0:'')+b.toString(16); }
+  return result;
+}
+function adminHash(pin){ return sha256hex('agrohama|'+pin+'|manut'); }
+function isAdmin(){ return Date.now() < adminUntil; }
+function adminTocar(){
+  adminUntil = Date.now() + ADMIN_SESSAO_MS;
+  clearTimeout(adminTimer);
+  adminTimer = setTimeout(()=>{ if(!isAdmin()){ renderAdminUi(); renderMaintenance(); } }, ADMIN_SESSAO_MS + 500);
+}
+function pedirAdmin(cb){
+  if(isAdmin()){ adminTocar(); if(cb) cb(); return true; }
+  pinMode = 'admin'; adminCallback = cb || null; pinBuffer = '';
+  setPinTitle('Senha do administrador'); setPinError(''); updatePinDots();
+  openModal('modalPin');
+  return false;
+}
+function entrarAdmin(){ pedirAdmin(()=>{}); }
+function sairAdmin(){
+  adminUntil = 0; clearTimeout(adminTimer);
+  renderAdminUi(); renderMaintenance();
+  toast('Modo administrador encerrado.');
+}
+function renderAdminUi(){
+  const bar = document.getElementById('adminBar'), wrap = document.getElementById('maintFormWrap');
+  const adm = isAdmin();
+  if(wrap) wrap.style.display = adm ? 'block' : 'none';
+  if(!bar) return;
+  bar.innerHTML = adm
+    ? `<div class="admin-bar is-on"><span>🔓 <b>Modo administrador</b> — cadastro liberado. Encerra sozinho ao sair desta aba ou após 10 min sem uso.</span><button class="btn btn-ghost btn-sm" onclick="sairAdmin()">Sair</button></div>`
+    : `<div class="admin-bar"><span>🔒 <b>Somente visualização.</b> O cadastro de manutenção é feito apenas pelo administrador.</span><button class="btn btn-primary btn-sm" onclick="entrarAdmin()">Entrar como administrador</button></div>`;
+}
+
+/* ===================== Senha (PIN) de acesso à aba Ajustes ===================== */
 // Bloqueio simples do lado do aparelho (não é criptografia). Protege contra acesso casual de quem
 // pega o celular emprestado, não é segurança de verdade. Senha fica salva neste aparelho apenas.
 const PIN_LENGTH = 4;
@@ -2973,7 +3119,7 @@ let pinPendingAction = null; // 'change' | 'remove' — o que fazer depois de um
 let pinFirstEntry = '';
 
 function requestTab(tab){
-  if((tab === 'settings' || tab === 'maintenance') && settings.adminPin){
+  if(tab === 'settings' && settings.adminPin){
     pinPendingTab = tab;
     pinMode = 'gate';
     pinBuffer = '';
@@ -2987,7 +3133,7 @@ function requestTab(tab){
 }
 function closePinModal(){
   closeModal('modalPin');
-  pinMode = null; pinBuffer = ''; pinPendingTab = null; pinPendingAction = null; pinFirstEntry = '';
+  pinMode = null; pinBuffer = ''; pinPendingTab = null; pinPendingAction = null; pinFirstEntry = ''; adminCallback = null;
 }
 function setPinTitle(t){ document.getElementById('pinModalTitle').textContent = t; }
 function setPinError(t){ document.getElementById('pinError').textContent = t; }
@@ -3009,6 +3155,26 @@ function pinBackspace(){
 }
 function handlePinComplete(){
   const entered = pinBuffer;
+  if(pinMode === 'admin'){
+    if(Date.now() < adminBloqueadoAte){
+      setPinError(`Muitas tentativas. Aguarde ${Math.ceil((adminBloqueadoAte-Date.now())/1000)} s.`);
+      pinBuffer = ''; updatePinDots(); return;
+    }
+    if(adminHash(entered) === ADMIN_PIN_HASH){
+      adminFalhas = 0; adminTocar();
+      const cb = adminCallback;
+      closePinModal();
+      renderAdminUi(); renderMaintenance();
+      toast('Modo administrador ativo.');
+      if(cb) cb();
+    } else {
+      adminFalhas++;
+      if(adminFalhas >= 5){ adminFalhas = 0; adminBloqueadoAte = Date.now() + 60000; setPinError('Muitas tentativas. Aguarde 60 s.'); }
+      else setPinError('Senha incorreta.');
+      pinBuffer = ''; updatePinDots();
+    }
+    return;
+  }
   if(pinMode === 'gate'){
     if(entered === settings.adminPin){
       closeModal('modalPin');
@@ -3156,6 +3322,7 @@ function importData(evt){
         throw new Error('formato inválido');
       }
 
+      if(importedMaint.length && !isAdmin()){ importedMaint = []; toast('Cadastro de manutenção do arquivo ignorado: só o administrador pode importar.'); }
       const existingIds = new Set(records.map(r=>r.id));
       let added = 0;
       importedRecords.forEach(r=>{
