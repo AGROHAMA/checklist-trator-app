@@ -425,7 +425,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02e</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02f</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -933,7 +933,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02e';
+const APP_VERSION = 'v02f';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -3928,6 +3928,10 @@ function mergePedidos(){
   let mudou = false;
   latest.forEach((e, pid) => {
     const novo = e.pedido, i = pedidos.findIndex(p => p.pid === pid);
+    if(novo.removido){ /* pedido excluído pela gerência: some de todos os aparelhos (se ninguém mexeu nele depois) */
+      if(i >= 0 && (novo.updatedAt||0) >= (pedidos[i].updatedAt||0)){ pedidos.splice(i, 1); mudou = true; }
+      return;
+    }
     if(i < 0){ pedidos.push(novo); mudou = true; }
     else if((novo.updatedAt||0) > (pedidos[i].updatedAt||0)){
       const velhos = pedidos[i].midia || [];
@@ -4168,6 +4172,7 @@ function pedAbrirDet(pid){
       acoes += `<button class="btn btn-ghost btn-block" onclick="pedFormCancelar('${p.pid}')">Cancelar pedido</button>`;
     }
   }
+  if(ap) acoes += `<button class="btn btn-ghost btn-block" style="margin-top:8px;color:var(--red-500,#c0392b);" onclick="pedFormExcluir('${p.pid}')">🗑 Excluir pedido</button>`;
   document.getElementById('pedTitle').textContent = `${p.maquina} — ${codigoPedido(p)}`;
   document.getElementById('pedBody').innerHTML = `
     <div class="ref-box"><b>${e(p.item)}</b>${p.qtd ? ' (' + e(p.qtd) + ')' : ''}<br>${urg.ico} ${urg.rot} · ${st.ico} <b>${st.rot}</b></div>
@@ -4261,6 +4266,25 @@ function pedConfirmarCancelar(pid){
     p.status = 'cancelado'; p.cancelPor = nome; p.cancelMotivo = motivo;
     p.historico.push({quem:nome, acao:'cancelou o pedido: ' + motivo, ts:Date.now()});
     publicarPedido(p, 'cancelado'); pedAbrirDet(pid); toast('Pedido cancelado.');
+  });
+}
+
+function pedFormExcluir(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  document.getElementById('pedTitle').textContent = `Excluir — ${p.maquina}`;
+  document.getElementById('pedBody').innerHTML = `<div class="ref-box">Excluir o pedido de <b>${escapeHtml(p.item)}</b> (${escapeHtml(codigoPedido(p))})?<br>Ele some da lista de <b>todos os aparelhos</b>. Use para pedido de teste ou lançado por engano; se a compra foi desistida, use "Cancelar pedido". O card do Planner e as fotos/vídeos no SharePoint não são apagados por aqui.</div>
+    <div class="actions-row"><button class="btn btn-danger" onclick="pedConfirmarExcluir('${p.pid}')">Excluir pedido</button><button class="btn btn-ghost" onclick="pedAbrirDet('${p.pid}')">Voltar</button></div>`;
+}
+function pedConfirmarExcluir(pid){
+  const p = pedidos.find(x => x.pid === pid); if(!p) return;
+  comAprovador(nome => {
+    p.removido = true;
+    (p.historico = p.historico || []).push({quem:nome, acao:'excluiu o pedido', ts:Date.now()});
+    publicarPedido(p, null);                       // grava o registro "removido" (fila de envio) sem mexer no Planner
+    pedidos = pedidos.filter(x => x.pid !== pid);  // e tira da lista deste aparelho
+    salvarPedidos();
+    closeModal('modalPedido'); try{ renderCompras(); renderComprasBadge(); }catch(e){}
+    toast('Pedido excluído.');
   });
 }
 
