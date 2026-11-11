@@ -425,7 +425,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02g</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02h</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -933,7 +933,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02g';
+const APP_VERSION = 'v02h';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1772,7 +1772,7 @@ function computeItemStatus(it, atual){
   const intervalo = parseFloat(it.intervaloHoras), ultimo = parseFloat(it.horimetroUltima);
   if(atual === null || isNaN(intervalo) || isNaN(ultimo)) return {status:'sem_dados', limite:null, restante:null};
   const limite = ultimo + intervalo, restante = limite - atual;
-  const aviso = Math.max(20, intervalo * 0.05); // 300 h -> 20 h; 600 h -> 30 h; 800 h -> 40 h
+  const aviso = Math.min(50, Math.max(20, intervalo * 0.5)); // avisa com 50 h de antecedência (igual ao fluxo do grupo) para dar tempo de comprar filtros/óleo
   let status = 'ok';
   if(restante <= 0) status = 'vencido';
   else if(restante <= aviso) status = 'proximo';
