@@ -291,6 +291,33 @@
   .maint-alert.is-proximo{background:var(--amber-100);border:1.5px solid var(--amber-500);color:var(--gray-900);}
   .maint-alert.is-vencido{background:var(--red-100);border:1.5px solid var(--red-500);color:var(--gray-900);}
   .maint-alert b{display:block;font-size:13px;}
+
+  /* Faixa de resumo (Registros) */
+  .sp-wrap{margin-bottom:12px;}
+  .sp-strip{display:flex;gap:8px;align-items:stretch;}
+  .sp-chip{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:8px 4px;min-height:58px;border-radius:14px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-900);cursor:pointer;box-shadow:var(--shadow);font-family:inherit;}
+  .sp-chip .sp-n{font-size:20px;font-weight:800;line-height:1.1;}
+  .sp-chip .sp-l{font-size:11.5px;color:var(--gray-600);font-weight:600;}
+  .sp-chip.sp-op{border-color:var(--green-500);}
+  .sp-chip.sp-venc:not(.is-zero){background:var(--red-100);border-color:var(--red-500);}
+  .sp-chip.sp-prox:not(.is-zero){background:var(--amber-100);border-color:var(--amber-500);}
+  .sp-chip.is-zero{opacity:.62;box-shadow:none;}
+  .sp-chip.is-open{outline:3px solid rgba(0,160,120,.35);}
+  .sp-refresh{flex:0 0 44px;border-radius:14px;border:1.5px solid var(--gray-200);background:var(--white);font-size:20px;color:var(--gray-700);cursor:pointer;padding:0;}
+  .sp-refresh.is-spin{opacity:.5;}
+  .sp-body{margin-top:8px;background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:6px 12px;max-height:46vh;overflow-y:auto;border:1px solid rgba(0,180,140,.18);}
+  .sp-meta{font-size:11.5px;color:var(--gray-600);padding:4px 0;}
+  .sp-empty{font-size:12.5px;color:var(--gray-700);padding:8px 0;}
+  .sp-row{padding:8px 0;border-top:1px solid var(--gray-200);font-size:13.5px;color:var(--gray-900);}
+  .sp-row:first-of-type,.sp-meta + .sp-row{border-top:0;}
+  .sp-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;}
+  .sp-who{font-size:12.5px;color:var(--gray-700);}
+  .sp-dur{font-size:12.5px;font-weight:700;color:var(--green-700);white-space:nowrap;}
+  .sp-sub{font-size:12px;color:var(--gray-700);margin-top:1px;line-height:1.35;}
+  .sp-row.is-stale{background:var(--red-100);border-radius:8px;padding:8px;} .sp-row.is-stale .sp-dur{color:var(--red-500);}
+  .sp-row.is-mine .sp-m::after{content:' · este aparelho';font-weight:400;font-size:11px;color:var(--gray-600);}
+  .sp-alert{cursor:pointer;border-left:4px solid var(--amber-500);padding-left:9px;margin:6px 0;border-top:0;background:var(--amber-100);border-radius:8px;padding-top:7px;padding-bottom:7px;}
+  .sp-alert.is-vencido{border-left-color:var(--red-500);background:var(--red-100);}
   .maint-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin-bottom:12px;}
   .maint-card.st-vencido{border:1.5px solid var(--red-500);}
   .maint-card.st-proximo{border:1.5px solid var(--amber-500);}
@@ -425,7 +452,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02h</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02i</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -933,7 +960,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02h';
+const APP_VERSION = 'v02i';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1335,37 +1362,73 @@ function fmtDur(ms){
   const h = Math.floor(m/60);
   return h >= 24 ? `${Math.floor(h/24)}d ${h%24}h` : `${h}h ${String(m%60).padStart(2,'0')}min`;
 }
+// Faixa de resumo da tela Registros: 3 contadores (em operação / vencidas / a vencer) que abrem a lista ao toque.
+let stripAberto = '';
+function stripToggle(k){ stripAberto = (stripAberto === k) ? '' : k; try{ renderSharedPanel(); }catch(e){} }
+function nomeCurto(n){ return String(n||'').split(' (')[0]; }
+function maintAlertGroups(){
+  const venc = new Map(), prox = new Map();
+  const add = (m, trator, texto, ord)=>{ if(!m.has(trator)) m.set(trator, {trator, linhas:[], ord}); const g = m.get(trator); g.linhas.push(texto); if(ord < g.ord) g.ord = ord; };
+  maintConfigs.forEach(cfg=>{
+    computeMaintStatus(cfg).itens.forEach(x=>{
+      if(x.status === 'vencido') add(venc, cfg.trator, `${escapeHtml(nomeCurto(x.item.nome))} · <b>${Math.abs(x.restante).toFixed(1)} h</b> vencida`, x.restante);
+      else if(x.status === 'proximo') add(prox, cfg.trator, `${escapeHtml(nomeCurto(x.item.nome))} · faltam <b>${x.restante.toFixed(1)} h</b>`, x.restante);
+    });
+    const g = computeGpsStatus(cfg);
+    if(g && g.status === 'vencido') add(venc, cfg.trator, `📡 GPS ${escapeHtml(gpsTexto(g))}`, -9999);
+    else if(g && g.status === 'proximo') add(prox, cfg.trator, `📡 GPS ${escapeHtml(gpsTexto(g))}`, g.dias);
+  });
+  const ord = m=>Array.from(m.values()).sort((a,b)=>a.ord-b.ord);
+  return {venc: ord(venc), prox: ord(prox)};
+}
 function renderSharedPanel(){
   const el = document.getElementById('sharedPanel');
   if(!el) return;
-  if(!settings.evListarUrl){ el.innerHTML = ''; return; }
-  const ops = operacoesAbertas();
+  const temEv = !!settings.evListarUrl;
+  const ops = temEv ? operacoesAbertas() : [];
   const agora = Date.now();
-  let meta;
-  if(evRefreshing) meta = 'atualizando…';
-  else if(!evCache.t) meta = evErro ? 'não consegui carregar agora — toque em ↻ para tentar de novo' : 'carregando…';
-  else {
-    const hh = new Date(evCache.t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    meta = evErro ? (navigator.onLine ? `não consegui atualizar agora (servidor ocupado) — mostrando dados das ${hh}` : `sem internet — mostrando dados das ${hh}`) : `atualizado às ${hh}`;
+  const al = maintAlertGroups();
+  let meta = '';
+  if(temEv){
+    if(evRefreshing) meta = 'atualizando…';
+    else if(!evCache.t) meta = evErro ? 'não consegui carregar agora — toque em ↻ para tentar de novo' : 'carregando…';
+    else {
+      const hh = new Date(evCache.t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      meta = evErro ? (navigator.onLine ? `não consegui atualizar agora (servidor ocupado) — mostrando dados das ${hh}` : `sem internet — mostrando dados das ${hh}`) : `atualizado às ${hh}`;
+    }
   }
-  const itens = ops.map(o=>{
-    const dur = agora - o.ts;
-    const stale = dur > ALERTA_HORAS_ABERTA*3600*1000;
-    const desde = new Date(o.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-    const onde = [o.talhao, o.implemento].filter(Boolean).map(escapeHtml).join(' · ');
-    const hi = (o.horimetroInicial !== '' && o.horimetroInicial !== undefined && o.horimetroInicial !== null) ? ` · horímetro inicial <b>${escapeHtml(o.horimetroInicial)}</b>` : '';
-    const btn = (stale && !o.local) ? `<div style="margin-top:7px;"><button class="btn btn-ghost btn-sm" onclick="encerrarPeloPainel('${escapeHtml(o.id)}')">Encerrar (operação esquecida)</button></div>` : '';
-    return `<div class="live-item${stale?' is-stale':''}${o.local?' is-mine':''}">
-      <div class="live-top"><b>🚜 ${escapeHtml(o.maquina)}</b><span class="live-dur">${stale?'⚠️ ':''}${fmtDur(dur)}</span></div>
-      <div>👤 ${escapeHtml(o.operador||'-')} · desde ${desde}${hi}</div>
-      ${onde ? `<div>📍 ${onde}</div>` : ''}${btn}
-    </div>`;
-  }).join('');
-  el.innerHTML = `<div class="live-panel">
-    <div class="live-head"><b>🚜 Máquinas em operação${ops.length ? ' (' + ops.length + ')' : ''}</b><button class="live-refresh" onclick="refreshShared(true)" aria-label="Atualizar">↻</button></div>
-    <div class="live-meta">${meta}</div>
-    ${ops.length ? itens : '<div class="live-empty">Nenhuma máquina em operação agora.</div>'}
+  if(!temEv && !al.venc.length && !al.prox.length){ el.innerHTML = ''; return; }
+  if(stripAberto === 'op' && !temEv) stripAberto = '';
+  const chip = (k, n, rotulo, ico, cls)=>`<button class="sp-chip ${cls}${stripAberto===k?' is-open':''}${n?'':' is-zero'}" onclick="stripToggle('${k}')" aria-expanded="${stripAberto===k}"><span class="sp-n">${ico} ${n}</span><span class="sp-l">${rotulo}</span></button>`;
+  const strip = `<div class="sp-strip">
+    ${temEv ? chip('op', ops.length, 'em operação', '🚜', 'sp-op') : ''}
+    ${chip('venc', al.venc.length, 'vencidas', '🔴', 'sp-venc')}
+    ${chip('prox', al.prox.length, 'a vencer', '🟠', 'sp-prox')}
+    ${temEv ? `<button class="sp-refresh${evRefreshing?' is-spin':''}" onclick="refreshShared(true)" aria-label="Atualizar">↻</button>` : ''}
   </div>`;
+  let corpo = '';
+  if(stripAberto === 'op'){
+    const itens = ops.map(o=>{
+      const dur = agora - o.ts;
+      const stale = dur > ALERTA_HORAS_ABERTA*3600*1000;
+      const desde = new Date(o.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const onde = [o.talhao, o.implemento].filter(Boolean).map(escapeHtml).join(' · ');
+      const hi = (o.horimetroInicial !== '' && o.horimetroInicial !== undefined && o.horimetroInicial !== null) ? ` · hor. inicial <b>${escapeHtml(o.horimetroInicial)}</b>` : '';
+      const btn = (stale && !o.local) ? `<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="encerrarPeloPainel('${escapeHtml(o.id)}')">Encerrar (operação esquecida)</button></div>` : '';
+      return `<div class="sp-row${stale?' is-stale':''}${o.local?' is-mine':''}">
+        <div class="sp-top"><span class="sp-m"><b>${escapeHtml(o.maquina)}</b> <span class="sp-who">${escapeHtml(o.operador||'-')}</span></span><span class="sp-dur">${stale?'⚠️ ':''}${fmtDur(dur)}</span></div>
+        <div class="sp-sub">${onde ? onde + ' · ' : ''}desde ${desde}${hi}</div>${btn}
+      </div>`;
+    }).join('');
+    corpo = `<div class="sp-body"><div class="sp-meta">${meta}</div>${ops.length ? itens : '<div class="sp-empty">Nenhuma máquina em operação agora.</div>'}</div>`;
+  } else if(stripAberto === 'venc' || stripAberto === 'prox'){
+    const lista = stripAberto === 'venc' ? al.venc : al.prox;
+    const cls = stripAberto === 'venc' ? 'is-vencido' : 'is-proximo';
+    corpo = `<div class="sp-body">${lista.length ? lista.map(g=>`<div class="sp-row sp-alert ${cls}" onclick="requestTab('maintenance')">
+        <b>${escapeHtml(g.trator)}</b><div class="sp-sub">${g.linhas.join('<br>')}</div>
+      </div>`).join('') : `<div class="sp-empty">Nenhuma manutenção ${stripAberto==='venc'?'vencida':'se aproximando'}. ✔️</div>`}</div>`;
+  }
+  el.innerHTML = `<div class="sp-wrap">${strip}${corpo}</div>`;
 }
 function encerrarPeloPainel(id){
   const o = operacoesAbertas().find(x=>x.id === id);
@@ -2107,29 +2170,10 @@ function renderMaintenance(){
 }
 
 function renderMaintBanner(){
+  // os alertas de manutenção agora ficam na faixa de resumo (renderSharedPanel)
   const el = document.getElementById('maintBanner');
-  if(!el) return;
-  const alerts = [];
-  maintConfigs.forEach(cfg=>{
-    computeMaintStatus(cfg).itens.forEach(x=>{
-      if(x.status !== 'proximo' && x.status !== 'vencido') return;
-      const venc = x.status === 'vencido';
-      alerts.push({cls: venc ? 'is-vencido' : 'is-proximo', urgente: venc,
-        html: `<b>🔧 ${escapeHtml(x.item.nome)} ${venc ? 'vencida' : 'se aproximando'} — ${escapeHtml(cfg.trator)}</b>${venc ? `vencida há ${Math.abs(x.restante).toFixed(1)} h` : `faltam ${x.restante.toFixed(1)} h`}`});
-    });
-  });
-  maintConfigs.forEach(cfg=>{
-    const g = computeGpsStatus(cfg);
-    if(g && (g.status === 'proximo' || g.status === 'vencido')){
-      alerts.push({cls: g.status==='vencido' ? 'is-vencido' : 'is-proximo', urgente: g.status==='vencido',
-        html: `<b>📡 Atualização do GPS ${g.status==='vencido' ? 'vencida' : 'vencendo'} — ${escapeHtml(cfg.trator)}</b>${gpsTexto(g)}`});
-    }
-  });
-  alerts.sort((a,b)=> (a.urgente?0:1) - (b.urgente?0:1));
-  if(alerts.length === 0){ el.innerHTML = ''; return; }
-  el.innerHTML = alerts.map(a=>`<div class="maint-alert ${a.cls}" onclick="requestTab('maintenance')" style="cursor:pointer;">
-      <div>${a.html}</div>
-    </div>`).join('');
+  if(el) el.innerHTML = '';
+  try{ renderSharedPanel(); }catch(e){}
 }
 
 /* Envia o alerta de manutenção (Planner/Teams) uma vez por cruzamento de limite, e reenvia se falhar por falta de conexão.
