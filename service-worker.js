@@ -6,7 +6,7 @@
    Ao publicar uma correção: basta subir os arquivos atualizados no GitHub Pages. Troque o número da
    versão abaixo (CACHE_VERSION) sempre que fizer uma alteração — isso garante que o cache antigo seja
    descartado e a versão nova seja usada em todos os aparelhos assim que eles tiverem internet. */
-const CACHE_VERSION = 'v02i';
+const CACHE_VERSION = 'v02j';
 const CACHE_NAME = `agrohama-checklist-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -26,7 +26,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => cache.addAll(APP_SHELL.map((u) => new Request(u, { cache: 'reload' }))))
       .catch(() => { /* segue mesmo se algum item falhar ao cachear na instalação */ })
   );
 });
@@ -146,7 +146,7 @@ self.addEventListener('fetch', (event) => {
     const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     const timer = ctl ? setTimeout(() => ctl.abort(), 8000) : null;
     event.respondWith(
-      fetch(req, ctl ? { signal: ctl.signal } : undefined)
+      fetch(req, ctl ? { signal: ctl.signal, cache: 'no-cache' } : { cache: 'no-cache' })
         .then((resp) => {
           if (timer) clearTimeout(timer);
           if (!resp || !resp.ok) throw new Error('resposta ruim');

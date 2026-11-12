@@ -452,7 +452,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02i</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02j</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -685,6 +685,8 @@
       <div class="hint" style="margin-bottom:10px;">Se alguma operação sumir do aparelho, toque aqui e envie o texto copiado para o suporte — ajuda a descobrir o que aconteceu.</div>
       <button class="btn btn-secondary btn-block" onclick="copyDiagnostico()">Copiar diagnóstico técnico</button>
       <div class="hint" style="margin-top:10px;text-align:center;">Versão do app: <b id="appVersionLabel"></b></div>
+      <button class="btn btn-secondary btn-block" style="margin-top:8px;" onclick="forcarAtualizacao()">🔄 Buscar atualização agora</button>
+      <div class="hint" style="margin:4px 0 0;text-align:center;">Use se o app não trocou para a versão nova sozinho. Não apaga seus registros.</div>
     </div>
 
     <div class="settings-block">
@@ -960,7 +962,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02i';
+const APP_VERSION = 'v02j';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -2338,8 +2340,10 @@ function render(){
       : '<span class="badge badge-concluido">Concluído</span>';
     const temProblemaAtivo = !!(r.problema && !r.problema.resolvido);
     const problemBadge = temProblemaAtivo ? '<span class="badge badge-problema">🔴 Parada / Problema</span>' : '';
-    const syncBadge = settings.webhookUrl
-      ? (r.synced ? '<span class="badge badge-sync">✔ sincronizado</span>' : '<span class="badge badge-sync">⏳ aguardando envio</span>')
+    // "sincronizado" só quando o Teams/Planner E o evento do painel já foram enviados (antes olhava só o Teams)
+    const evPend = !!(settings.evGravarUrl && r.compart && (!r.evInicioSynced || (r.status === 'concluido' && !r.evFimSynced)));
+    const syncBadge = (settings.webhookUrl || settings.evGravarUrl)
+      ? ((r.synced || !settings.webhookUrl) && !evPend ? '<span class="badge badge-sync">✔ sincronizado</span>' : '<span class="badge badge-sync">⏳ aguardando envio</span>')
       : '';
     const problemaBox = temProblemaAtivo
       ? `<div class="problema-box">🔴 <b>Máquina parada</b> às ${new Date(r.problema.reportedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} — ${escapeHtml(r.problema.texto)}${r.problema.foto ? ' 📷' : ''}</div>`
@@ -2477,7 +2481,7 @@ function saveStart(){
   const saved = saveRecords(records);
   closeModal('modalStart');
   render();
-  if(saved) toast('Operação iniciada e salva neste aparelho.');
+  if(saved) toast('Operação iniciada e salva. Espere o card mostrar "sincronizado" antes de fechar o app.');
   attemptSync(rec, 'inicio');
   sendEventos();
   checkMaintenanceAlerts();
@@ -2612,7 +2616,7 @@ function saveFinish(){
   const saved = saveRecords(records);
   closeModal('modalFinish');
   render();
-  if(saved) toast('Operação finalizada e salva neste aparelho.');
+  if(saved) toast('Operação finalizada e salva. Espere o card mostrar "sincronizado" antes de fechar o app.');
   attemptSync(r, 'fechamento');
   syncHorimetroAtualizado(r);
   sendEventos();
@@ -3705,10 +3709,27 @@ updatePendingSyncButton();
 retryPendingSyncs();
 checkHorimetroLembrete();
 setInterval(checkHorimetroLembrete, 30000);
+// Total de itens ainda não enviados (mesma conta do botão "Enviar pendências agora").
+function totalPendenciasEnvio(){
+  try{
+    return (settings.webhookUrl ? records.filter(r=>r && !r.synced).length : 0) + pendingMaintAlerts().length
+      + pendingHorimetroSyncs().length + eventosPendentes().length + (settings.evGravarUrl ? loadCancels().length : 0);
+  }catch(e){ return 0; }
+}
+// Operador finaliza e fecha o app na hora: o envio em andamento é cortado e, sem isto, nada acordava o
+// service worker para tentar de novo (só acordava se o envio falhasse com o app ainda aberto).
+// Ao sair do app com algo pendente, pede ao navegador o envio em segundo plano (a trava do app e do
+// service worker evita mandar duas vezes).
+function armarSeSaindoComPendencia(){
+  if(totalPendenciasEnvio() > 0) armBackgroundSync();
+}
+window.addEventListener('pagehide', armarSeSaindoComPendencia);
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible'){
     checkHorimetroLembrete();
     retryPendingSyncs();
+  } else {
+    armarSeSaindoComPendencia();
   }
 });
 // Reenvio automático enquanto o app está aberto: a cada 45s, se ainda sobrou algo pendente, tenta de
@@ -3740,6 +3761,19 @@ setInterval(() => {
    reinstalar nada no celular. Sem internet, continua funcionando normalmente com a última versão
    que já tinha sido baixada. */
 // Só recarrega quando nenhuma tela de preenchimento está aberta (antes, a atualização podia apagar o que a pessoa estava digitando).
+// Botão em Ajustes: força o aparelho a baixar a versão mais nova (limpa só os arquivos do app guardados no
+// navegador; registros, configurações e fila de envio ficam intactos).
+async function forcarAtualizacao(){
+  if(!navigator.onLine){ toast('Sem internet agora. Tente de novo com sinal.'); return; }
+  if(!confirm('Buscar a versão mais nova do app agora? A tela vai recarregar. Seus registros não são apagados.')) return;
+  try{
+    const r = await fetch('index.html?_=' + Date.now(), {cache:'reload'});
+    if(!r.ok) throw new Error('http ' + r.status);
+    if('serviceWorker' in navigator){ const regs = await navigator.serviceWorker.getRegistrations(); for(const g of regs) await g.unregister(); }
+    if(window.caches){ for(const k of await caches.keys()) await caches.delete(k); }
+  }catch(e){ toast('Não consegui buscar agora. Tente de novo com sinal melhor.'); return; }
+  window.location.reload();
+}
 function recarregarQuandoSeguro(){
   const aberto = ()=> !!document.querySelector('.modal-overlay.open');
   if(!aberto()){ setTimeout(()=>window.location.reload(), 800); return; }
