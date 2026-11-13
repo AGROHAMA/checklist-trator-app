@@ -437,6 +437,13 @@
   .feita-lbl{font-size:12.5px;font-weight:700;color:var(--green-700);}
   .feita-btn{min-height:36px;padding:6px 12px;font-size:13px;}
   .mt-det{margin-top:8px;font-size:12px;color:var(--gray-700);}
+  .troca-row{background:linear-gradient(135deg,#fff7e0,#ffeede);}
+  .troca-blk{margin-top:6px;padding:6px 8px;border-radius:8px;background:var(--gray-100,#f3f4f6);line-height:1.45;}
+  .troca-prox{margin-top:8px;padding:8px;border-radius:10px;background:#fff7e0;font-size:12.5px;line-height:1.45;}
+  .troca-sec{margin-top:10px;padding:8px;border:1px solid var(--gray-200,#e5e7eb);border-radius:10px;}
+  .troca-sec>b{display:block;font-size:12.5px;margin-bottom:6px;}
+  .troca-frow{display:grid;grid-template-columns:1.6fr 1.2fr .6fr auto;gap:6px;margin-bottom:6px;align-items:center;}
+  .troca-frow input{min-width:0;}
   .mt-det summary{cursor:pointer;font-weight:700;color:var(--green-700);}
   .maint-card-actions{margin-top:10px;}
 
@@ -452,7 +459,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02j</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02k</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -906,6 +913,14 @@
   </div>
 </div>
 
+<!-- Modal: Registro da troca (filtros, óleo, arrefecimento) -->
+<div class="modal-overlay" id="modalTroca">
+  <div class="modal">
+    <div class="modal-title"><span id="trocaTitle">Registrar troca</span><button class="close" onclick="closeModal('modalTroca')">&times;</button></div>
+    <div id="trocaBody"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalPin">
   <div class="modal">
     <div class="modal-title"><span id="pinModalTitle">Digite a senha</span><button class="close" onclick="closePinModal()">&times;</button></div>
@@ -962,7 +977,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02j';
+const APP_VERSION = 'v02k';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1465,16 +1480,16 @@ function sharedHorCands(alvo){
   sharedEvents.forEach(e=>{ if(e && e.tipo === 'inicio' && e.id) inicios[e.id] = e; });
   sharedEvents.forEach(e=>{
     if(!e || !e.maquina || normEquip(e.maquina) !== alvo) return;
-    const add = (v, qual)=>{
+    const add = (v, qual, t)=>{
       const n = parseFloat(v);
-      if(!isNaN(n)) out.push({v:n, fonte:`operação de ${dataBR(e.data || (inicios[e.refInicio]||{}).data)} (${e.operador||(inicios[e.refInicio]||{}).operador||'-'}), horímetro ${qual}`});
+      if(!isNaN(n)) out.push({v:n, fonte:`operação de ${dataBR(e.data || (inicios[e.refInicio]||{}).data)} (${e.operador||(inicios[e.refInicio]||{}).operador||'-'}), horímetro ${qual}`, t:t||0});
     };
     if(e.tipo === 'manutencao' || e.tipo === 'pedido') return;
-    add(e.horimetroInicial, 'inicial');
+    add(e.horimetroInicial, 'inicial', tsData(e.data, e.horaInicio));
     if(e.tipo === 'fim'){
       const ini = inicios[e.refInicio];
-      if(!ini || usoPlausivel(ini.horimetroInicial, e.horimetroFinal, tsData(ini.data, ini.horaInicio), tsData(e.dataFim || ini.data, e.horaFinal))) add(e.horimetroFinal, 'final');
-    } else add(e.horimetroFinal, 'final');
+      if(!ini || usoPlausivel(ini.horimetroInicial, e.horimetroFinal, tsData(ini.data, ini.horaInicio), tsData(e.dataFim || ini.data, e.horaFinal))) add(e.horimetroFinal, 'final', tsData(e.dataFim || ini && ini.data, e.horaFinal));
+    } else add(e.horimetroFinal, 'final', tsData(e.dataFim || e.data, e.horaFinal));
   });
   return out;
 }
@@ -1639,7 +1654,8 @@ function maintItens(cfg){
 function itensDoRegistro(e){
   if(Array.isArray(e.itens)) return e.itens.map(it=>({id:it.id||itemUid(), nome:it.nome||'Item', intervaloHoras:String(it.intervaloHoras===undefined?'':it.intervaloHoras),
     horimetroUltima:(it.horimetroUltima===undefined||it.horimetroUltima===null)?'':String(it.horimetroUltima),
-    alertSent:{proximo:!!(it.alertSent&&it.alertSent.proximo), vencido:!!(it.alertSent&&it.alertSent.vencido)}}));
+    alertSent:{proximo:!!(it.alertSent&&it.alertSent.proximo), vencido:!!(it.alertSent&&it.alertSent.vencido)},
+    trocas:Array.isArray(it.trocas) ? it.trocas.slice(0,TROCA_MAX_HIST) : []}));
   return itensDeLegado(e.intervaloHoras, e.horimetroUltimaManutencao, e.alertSent);
 }
 // Mantém os campos antigos espelhando o 1º item (aparelhos/fluxos que ainda não conhecem a lista de itens).
@@ -1662,10 +1678,10 @@ function horimetroInfo(tratorNome, semPub){
     if(!r.tractor || normEquip(r.tractor) !== alvo) return;
     const quem = `operação de ${dataBR(r.date)} (${r.operator||'-'}), horímetro`;
     const ini = parseFloat(r.horimetroInicial);
-    if(!isNaN(ini)) c.push({v:ini, fonte:`${quem} inicial`});
+    if(!isNaN(ini)) c.push({v:ini, fonte:`${quem} inicial`, t:tsData(r.date, r.horaInicio)});
     if(usoPlausivel(r.horimetroInicial, r.horimetroFinal, tsData(r.date, r.horaInicio), tsData(r.dataFim || r.date, r.horaFinal))){
       const fin = parseFloat(r.horimetroFinal);
-      if(!isNaN(fin)) c.push({v:fin, fonte:`${quem} final`});
+      if(!isNaN(fin)) c.push({v:fin, fonte:`${quem} final`, t:tsData(r.dataFim || r.date, r.horaFinal)});
     }
   });
   sharedHorCands(alvo).forEach(x=>c.push(x));
@@ -1674,7 +1690,7 @@ function horimetroInfo(tratorNome, semPub){
     if(ph !== null) c.push({v:ph, fonte:'último horímetro publicado no cadastro compartilhado'});
   }
   if(!c.length) return vazio;
-  c.sort((x,y)=>y.v-x.v);
+  c.sort((x,y)=>(y.v-x.v) || ((y.t||0)-(x.t||0))); // mesmo valor: vale a leitura mais recente (ex.: início de hoje = final de ontem)
   const suspeitos = [];
   // Referência: maior "horímetro da última manutenção" cadastrado para a máquina. Um horímetro MUITO acima dela
   // (mais de HORIMETRO_SALTO_REF h) é erro de digitação, mesmo que seja o único valor conhecido
@@ -1747,7 +1763,7 @@ function maintRegistro(cfg, removido){
     tipo: 'manutencao',
     maquina: nomeParaManutencao(cfg.trator),
     intervaloHoras: cfg.intervaloHoras, horimetroUltimaManutencao: cfg.horimetroUltimaManutencao,
-    itens: maintItens(cfg).map(it=>({id:it.id, nome:it.nome, intervaloHoras:it.intervaloHoras, horimetroUltima:it.horimetroUltima, alertSent:it.alertSent})),
+    itens: maintItens(cfg).map(it=>({id:it.id, nome:it.nome, intervaloHoras:it.intervaloHoras, horimetroUltima:it.horimetroUltima, alertSent:it.alertSent, trocas:(it.trocas||[]).slice(0,TROCA_MAX_HIST)})),
     machineRef: cfg.machineRef || null,
     gpsVencimento: cfg.gpsVencimento || '',
     horimetroAtual: real !== null ? real : prev,
@@ -2042,7 +2058,7 @@ function saveMaintConfig(){
     const velho = antigos.find(x=>x.id===id);
     const igual = velho && String(velho.intervaloHoras) === r.intervaloHoras && String(velho.horimetroUltima||'') === r.horimetroUltima;
     itens.push({id, nome:r.nome || 'Manutenção', intervaloHoras:r.intervaloHoras, horimetroUltima:r.horimetroUltima,
-      alertSent: igual ? velho.alertSent : novoAlertSent()});
+      alertSent: igual ? velho.alertSent : novoAlertSent(), trocas: velho ? (velho.trocas||[]) : []});
   });
   if(cfgAntigo){
     const cfg = cfgAntigo;
@@ -2083,6 +2099,189 @@ function deleteMaintConfig(id){
   if(alvoCfg) publishMaint(alvoCfg, true);
   renderMaintenance();
   render();
+}
+
+/* ===================== Registro da troca (filtros, óleo, arrefecimento) =====================
+   Quem faz a troca registra o que foi usado. O registro fica no item (it.trocas, mais novo primeiro) e vai junto com o
+   cadastro compartilhado (arquivo m_), então a próxima troca já mostra os códigos dos filtros e as quantidades. */
+const TROCA_MAX_HIST = 5, TROCA_FOTOS_MAX = 8;
+const TROCA_QUEM_KEY = 'agrohama_troca_quem_v1';
+let trocaForm = null;
+function trocaSemAcento(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function trocaTipoItem(nome){
+  const n = trocaSemAcento(nome);
+  if(/hidraul|transmiss/.test(n)) return 'hid';
+  if(/\bar\b/.test(n) || /filtro de ar/.test(n)) return 'ar';
+  if(/period|motor|oleo|revis/.test(n)) return 'motor';
+  return 'outro';
+}
+function trocaFiltrosPadrao(tipo){
+  if(tipo === 'motor') return ['Filtro de óleo do motor','Filtro de combustível (principal)','Filtro de combustível (pré-filtro / separador)'];
+  if(tipo === 'ar') return ['Filtro de ar primário','Filtro de ar secundário','Filtro de ar da cabine'];
+  if(tipo === 'hid') return ['Filtro hidráulico / transmissão'];
+  return [''];
+}
+function trocaBuscar(cfgId, itemId){
+  const cfg = maintConfigs.find(c=>c.id===cfgId); if(!cfg) return {};
+  const it = maintItens(cfg).find(x=>x.id===itemId); return {cfg, it};
+}
+function trocaDataBR(ts){ const d = new Date(ts); return `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`; }
+function trocaFmtH(v){ const n = parseFloat(v); return isNaN(n) ? '—' : String(Math.round(n*10)/10).replace('.', ','); }
+function trocaTextoFiltros(t){
+  return (t.filtros||[]).filter(f=>f.n || f.c).map(f=>`${escapeHtml(f.n||'Filtro')}${f.c ? ' — <b>' + escapeHtml(f.c) + '</b>' : ' — (sem código)'}${f.q ? ' ×' + escapeHtml(String(f.q)) : ''}`).join('; ');
+}
+function trocaTextoFluido(rot, f){
+  if(!f || (!f.tipo && !f.l)) return '';
+  return `${rot}: ${f.tipo ? '<b>' + escapeHtml(f.tipo) + '</b>' : ''}${f.l ? ' · ' + escapeHtml(String(f.l)) + ' L' : ''}`;
+}
+function trocaResumoHtml(t){
+  const partes = [];
+  const fl = trocaTextoFiltros(t); if(fl) partes.push('Filtros: ' + fl);
+  [['Óleo do motor', t.oleoMotor], ['Óleo hidráulico/transmissão', t.hid], ['Arrefecimento', t.arref]].forEach(([r,f])=>{ const x = trocaTextoFluido(r, f); if(x) partes.push(x); });
+  if(t.obs) partes.push('Obs.: ' + escapeHtml(t.obs));
+  if(t.fotos && t.fotos.length) partes.push(`📷 ${t.fotos.length} foto(s) na pasta TROCAS_MANUTENCAO/${escapeHtml(t.maq||'')}`);
+  return partes.join('<br>');
+}
+// Aviso na própria tabela: o que comprar para a próxima troca (usa os códigos da última troca registrada).
+function trocaProximaHtml(info){
+  const linhas = [];
+  info.itens.forEach(x=>{
+    if(x.status !== 'proximo' && x.status !== 'vencido') return;
+    const t = (x.item.trocas||[])[0];
+    const nome = String(x.item.nome||'').replace(/\s*\(.*$/, '');
+    if(!t) linhas.push(`ℹ️ <b>${escapeHtml(nome)}</b>: ainda não há códigos de filtro registrados. Anote na troca para a próxima vez já estar pronto.`);
+    else {
+      const f = trocaTextoFiltros(t), o = trocaTextoFluido('Óleo do motor', t.oleoMotor), h = trocaTextoFluido('Óleo hidráulico/transmissão', t.hid), a = trocaTextoFluido('Arrefecimento', t.arref);
+      linhas.push(`🛒 <b>Para a próxima ${escapeHtml(nome)}</b> (última em ${trocaDataBR(t.ts)}, ${trocaFmtH(t.hor)} h): ${[f, o, h, a].filter(Boolean).join('; ') || 'sem detalhes'}`);
+    }
+  });
+  return linhas.length ? `<div class="troca-prox">${linhas.join('<br>')}</div>` : '';
+}
+function trocaHistoricoHtml(cfg){
+  const blocos = [];
+  maintItens(cfg).forEach(it=>{
+    const l = it.trocas || []; if(!l.length) return;
+    const nome = String(it.nome||'').replace(/\s*\(.*$/, '');
+    let h = `<div class="troca-blk"><b>${escapeHtml(nome)}</b> — última troca em ${trocaDataBR(l[0].ts)} · ${trocaFmtH(l[0].hor)} h${l[0].por ? ' · por ' + escapeHtml(l[0].por) : ''}<br>${trocaResumoHtml(l[0]) || 'sem detalhes'}`;
+    if(l.length > 1) h += `<details style="margin-top:4px;"><summary>Trocas anteriores (${l.length-1})</summary>${l.slice(1).map(t=>`<div style="margin-top:4px;">${trocaDataBR(t.ts)} · ${trocaFmtH(t.hor)} h${t.por ? ' · ' + escapeHtml(t.por) : ''}<br>${trocaResumoHtml(t) || 'sem detalhes'}</div>`).join('')}</details>`;
+    blocos.push(h + '</div>');
+  });
+  return blocos.length ? `<div style="margin-bottom:6px;"><b>🔧 Trocas registradas</b>${blocos.join('')}</div>` : '';
+}
+function trocaFiltroRowHtml(f, i){
+  return `<div class="troca-frow" data-i="${i}">
+    <input type="text" class="tf-n" placeholder="filtro" value="${escapeHtml(f.n||'')}">
+    <input type="text" class="tf-c" placeholder="código da peça" value="${escapeHtml(f.c||'')}" autocapitalize="characters">
+    <input type="text" class="tf-q" placeholder="qtd" value="${escapeHtml(String(f.q||'1'))}">
+    <button class="btn btn-ghost btn-sm" onclick="trocaRemoverFiltro(${i})" title="Remover">✕</button></div>`;
+}
+function trocaLerFiltros(){
+  if(!trocaForm) return;
+  trocaForm.filtros = Array.from(document.querySelectorAll('#tr_filtros .troca-frow')).map(r => ({
+    n:r.querySelector('.tf-n').value.trim(), c:r.querySelector('.tf-c').value.trim().toUpperCase(), q:r.querySelector('.tf-q').value.trim()}));
+}
+function trocaRenderFiltros(){
+  const el = document.getElementById('tr_filtros'); if(!el || !trocaForm) return;
+  el.innerHTML = trocaForm.filtros.map(trocaFiltroRowHtml).join('');
+}
+function trocaAddFiltro(){ trocaLerFiltros(); trocaForm.filtros.push({n:'', c:'', q:'1'}); trocaRenderFiltros(); }
+function trocaRemoverFiltro(i){ trocaLerFiltros(); trocaForm.filtros.splice(i, 1); trocaRenderFiltros(); }
+async function trocaAddFotos(fl){
+  for(const f of Array.from(fl || [])){
+    if(trocaForm.files.length >= TROCA_FOTOS_MAX){ toast(`Máximo de ${TROCA_FOTOS_MAX} fotos por troca.`); break; }
+    const c = await comprimirImagem(f);
+    trocaForm.files.push(c || {blob:f, mime:f.type || 'image/jpeg', ext:'jpg', tipo:'foto'});
+  }
+  trocaRenderFotos();
+}
+function trocaRenderFotos(){
+  const el = document.getElementById('tr_fotos'); if(!el || !trocaForm) return;
+  el.innerHTML = trocaForm.files.map((f,i)=>`<div class="photo-field is-done" style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:13px;">📷 foto ${i+1} <span class="hint">(${Math.max(1, Math.round(f.blob.size/1024))} KB)</span></span><button class="btn btn-ghost btn-sm" onclick="trocaRemoverFoto(${i})">✕</button></div>`).join('');
+}
+function trocaRemoverFoto(i){ trocaForm.files.splice(i, 1); trocaRenderFotos(); }
+function abrirTroca(cfgId, itemId){
+  const {cfg, it} = trocaBuscar(cfgId, itemId); if(!cfg || !it) return;
+  const tipo = trocaTipoItem(it.nome);
+  const ult = (it.trocas||[])[0] || null;
+  const filtros = ult && (ult.filtros||[]).length ? ult.filtros.map(f=>({n:f.n||'', c:f.c||'', q:f.q||'1'}))
+                                                   : trocaFiltrosPadrao(tipo).map(n=>({n, c:'', q:'1'}));
+  trocaForm = {cfgId, itemId, tipo, filtros, files:[]};
+  const atual = getCurrentHorimetro(cfg.trator);
+  const quem = (()=>{ try{ return localStorage.getItem(TROCA_QUEM_KEY) || ''; }catch(e){ return ''; } })();
+  const fl = (o, k) => escapeHtml(o && o[k] !== undefined ? String(o[k]) : '');
+  const nomeCurto = String(it.nome||'').replace(/\s*\(.*$/, '');
+  document.getElementById('trocaTitle').textContent = `Troca: ${nomeCurto} — ${cfg.trator}`;
+  document.getElementById('trocaBody').innerHTML = `
+    <div class="ref-box">${ult ? `Os campos já vêm com o que foi usado na troca de <b>${trocaDataBR(ult.ts)}</b> (${trocaFmtH(ult.hor)} h). <b>Confira e corrija</b> o que mudou.` : `Primeira troca registrada deste item: anote os <b>códigos dos filtros</b> (leia na etiqueta de cada filtro novo) e o óleo usado. Da próxima vez isso já aparece pronto.`}
+      Ao salvar, a contagem de <b>${escapeHtml(nomeCurto)}</b> é zerada no horímetro informado.</div>
+    <div class="row2">
+      <div class="field"><label>Horímetro da troca</label><input type="number" id="tr_hor" step="0.1" value="${atual !== null ? atual : ''}" placeholder="horímetro"></div>
+      <div class="field"><label>Quem fez a troca</label><input type="text" id="tr_quem" value="${escapeHtml(quem)}" placeholder="nome"></div>
+    </div>
+    <div class="troca-sec"><b>Filtros trocados</b>
+      <div id="tr_filtros"></div>
+      <button class="btn btn-secondary btn-sm" onclick="trocaAddFiltro()">+ Adicionar filtro</button>
+      <div class="hint">Código = o número impresso na caixa/etiqueta do filtro novo.</div>
+    </div>
+    ${tipo === 'motor' ? `<div class="troca-sec"><b>Óleo do motor</b><div class="row2">
+      <div class="field"><label>Qual óleo</label><input type="text" id="tr_om_t" value="${fl(ult&&ult.oleoMotor,'tipo')}" placeholder="ex: 15W-40 CK-4"></div>
+      <div class="field"><label>Litros colocados</label><input type="number" id="tr_om_l" step="0.1" value="${fl(ult&&ult.oleoMotor,'l')}" placeholder="litros"></div></div></div>` : ''}
+    ${tipo === 'hid' ? `<div class="troca-sec"><b>Óleo hidráulico / transmissão</b><div class="row2">
+      <div class="field"><label>Qual óleo</label><input type="text" id="tr_hid_t" value="${fl(ult&&ult.hid,'tipo')}" placeholder="ex: MAT 3525"></div>
+      <div class="field"><label>Litros colocados</label><input type="number" id="tr_hid_l" step="0.1" value="${fl(ult&&ult.hid,'l')}" placeholder="litros"></div></div></div>` : ''}
+    <div class="troca-sec"><b>Líquido de arrefecimento (se trocou ou completou)</b><div class="row2">
+      <div class="field"><label>Qual líquido (tipo/cor)</label><input type="text" id="tr_ar_t" value="${fl(ult&&ult.arref,'tipo')}" placeholder="ex: OAT rosa 50%"></div>
+      <div class="field"><label>Litros</label><input type="number" id="tr_ar_l" step="0.1" value="${fl(ult&&ult.arref,'l')}" placeholder="litros"></div></div></div>
+    <div class="field"><label>Observações</label><textarea id="tr_obs" placeholder="opcional: algo que chamou a atenção, peça diferente, etc."></textarea></div>
+    <div class="field"><label>Fotos (etiquetas dos filtros, adesivos, óleo)</label>
+      <div class="actions-row" style="margin-bottom:6px;"><button class="btn btn-secondary btn-sm" onclick="document.getElementById('tr_file').click()">📷 Adicionar foto</button></div>
+      <input type="file" id="tr_file" accept="image/*" multiple style="display:none;" onchange="trocaAddFotos(this.files);this.value='';">
+      <div id="tr_fotos"></div>
+      <div class="hint">Opcional. Vão para a pasta <b>TROCAS_MANUTENCAO/${escapeHtml(nomeSeguro(nomeParaManutencao(cfg.trator)))}</b>.</div>
+    </div>
+    <div class="actions-row"><button class="btn btn-primary" id="tr_salvar" onclick="trocaSalvar()">Salvar troca</button></div>`;
+  trocaRenderFiltros();
+  openModal('modalTroca');
+}
+async function trocaSalvar(){
+  if(!trocaForm) return;
+  const {cfg, it} = trocaBuscar(trocaForm.cfgId, trocaForm.itemId); if(!cfg || !it){ toast('Equipamento não encontrado.'); return; }
+  const v = id => { const e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
+  const hor = parseFloat(v('tr_hor').replace(',', '.')), quem = v('tr_quem');
+  if(isNaN(hor)){ toast('Informe o horímetro da troca.'); return; }
+  if(!quem){ toast('Informe quem fez a troca.'); return; }
+  const atual = getCurrentHorimetro(cfg.trator);
+  if(atual !== null && Math.abs(hor - atual) > 50 && !confirm(`O horímetro informado (${hor}) está bem diferente do atual (${atual}). Está certo?`)) return;
+  trocaLerFiltros();
+  const filtros = trocaForm.filtros.filter(f=>f.n || f.c);
+  if(!filtros.some(f=>f.c) && !confirm('Nenhum código de filtro foi informado. Registrar a troca mesmo assim?')) return;
+  const btn = document.getElementById('tr_salvar'); if(btn) btn.disabled = true;
+  const agora = Date.now(), maq = nomeSeguro(nomeParaManutencao(cfg.trator));
+  const nomeCurto = nomeSeguro(String(it.nome||'Item').replace(/\s*\(.*$/, ''));
+  const fotos = [], blobs = [];
+  trocaForm.files.forEach((f, i) => {
+    const nome = `${maq} - TROCA ${nomeCurto} - ${fmtDMA(agora)} - ${i+1}.${f.ext}`;
+    fotos.push(nome);
+    blobs.push({id:'troca:' + trocaForm.cfgId + ':' + agora + ':' + nome, pid:null, maquina:maq, nome, mime:f.mime, blob:f.blob, ts:agora, pasta:'TROCAS_MANUTENCAO/' + maq});
+  });
+  try{ for(const b of blobs) await idbPut(b); }
+  catch(e){ if(btn) btn.disabled = false; toast('Este aparelho não conseguiu guardar as fotos. Tente de novo ou salve sem foto.', 5000); return; }
+  const fluido = (t, l) => (t || l) ? {tipo:t, l:l} : null;
+  const troca = {ts:agora, hor, por:quem, maq, filtros, oleoMotor:fluido(v('tr_om_t'), v('tr_om_l')), hid:fluido(v('tr_hid_t'), v('tr_hid_l')),
+    arref:fluido(v('tr_ar_t'), v('tr_ar_l')), obs:v('tr_obs'), fotos};
+  try{ localStorage.setItem(TROCA_QUEM_KEY, quem); }catch(e){}
+  it.trocas = [troca].concat(it.trocas || []).slice(0, TROCA_MAX_HIST);
+  it.horimetroUltima = String(hor);
+  it.alertSent = novoAlertSent();
+  maintSyncLegacy(cfg);
+  cfg.updatedAt = Date.now();
+  saveMaint(maintConfigs);
+  publishMaint(cfg, false);
+  closeModal('modalTroca');
+  trocaForm = null;
+  atualizarPendMidia(); enviarMidias();
+  renderMaintenance(); renderMaintBanner(); render();
+  toast(`${nomeCurto}: troca registrada, contagem zerada.`);
 }
 
 function markMaintDone(id, itemId){
@@ -2143,16 +2342,19 @@ function renderMaintenance(){
     const feitaHtml = (isAdmin() && info.itens.length)
       ? `<div class="feita-row"><span class="feita-lbl">✔ Feita agora:</span>${info.itens.map(x=>`<button class="btn btn-secondary btn-sm feita-btn" onclick="markMaintDone('${cfg.id}','${x.item.id}')">${escapeHtml(curto(x.item.nome))}</button>`).join('')}</div>`
       : '';
+    const trocaRowHtml = info.itens.length
+      ? `<div class="feita-row troca-row"><span class="feita-lbl">🔧 Registrar troca:</span>${info.itens.map(x=>`<button class="btn btn-secondary btn-sm feita-btn" onclick="abrirTroca('${cfg.id}','${x.item.id}')">${escapeHtml(curto(x.item.nome))}</button>`).join('')}</div>`
+      : '';
     const suspHtml = (info.suspeitos||[]).map(x=>`<div style="font-size:.85em;color:var(--amber-700);margin-top:4px;">⚠️ Valor ${x.v} ignorado (parece erro de digitação): ${escapeHtml(x.fonte)}. Corrija ou apague esse registro.</div>`).join('');
     const manutencaoHtml = temManutencaoConfigurada
       ? `<div>Horímetro atual (estimado): <b>${info.atual === null ? 'sem registros ainda' : fmtH(info.atual)}</b></div>${suspHtml}
-         <table class="mt-tab"><tr><th>Item</th><th>A cada</th><th>Próxima em</th><th>Falta</th></tr>${linhasHtml}</table>${feitaHtml}`
+         <table class="mt-tab"><tr><th>Item</th><th>A cada</th><th>Próxima em</th><th>Falta</th></tr>${linhasHtml}</table>${trocaProximaHtml(info)}${feitaHtml}${trocaRowHtml}`
       : `Manutenção por horímetro: <b>não configurada</b> nesse equipamento.`;
     const gps = computeGpsStatus(cfg);
     const gpsHtml = gps ? `<div style="margin-top:6px;">📡 GPS: <b style="color:${gps.status==='vencido'?'var(--red-500,#c0392b)':(gps.status==='proximo'?'var(--amber-700)':'inherit')}">${gpsTexto(gps)}</b></div>` : '';
     const stGeral = pioStatus(info.status, gps && gps.status);
     const preview = previewFormNumber(cfg);
-    const detalhes = `<details class="mt-det"><summary>Mais detalhes</summary>${info.fonte ? `<div>Fonte do horímetro: ${escapeHtml(info.fonte)}</div>` : ''}${preview ? `<div>📋 Exemplo de talão se iniciar agora: <b>${preview}</b> (referência ${escapeHtml(String(cfg.machineRef))})</div>` : `<div>📋 Numeração do talão: <b>número de referência não cadastrado</b>.</div>`}</details>`;
+    const detalhes = `<details class="mt-det"><summary>Mais detalhes</summary>${trocaHistoricoHtml(cfg)}${info.fonte ? `<div>Fonte do horímetro: ${escapeHtml(info.fonte)}</div>` : ''}${preview ? `<div>📋 Exemplo de talão se iniciar agora: <b>${preview}</b> (referência ${escapeHtml(String(cfg.machineRef))})</div>` : `<div>📋 Numeração do talão: <b>número de referência não cadastrado</b>.</div>`}</details>`;
     return `
     <div class="maint-card st-${stGeral}">
       <div class="maint-card-head">
@@ -3931,7 +4133,7 @@ function enviarMidias(){
       try{
         const b64 = await blobParaBase64(m.blob);
         const resp = await fetchTimeout(settings.pedidoMidiaUrl, {method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({maquina:m.maquina, nome:m.nome, mime:m.mime, pasta:'PEDIDOS_COMPRA/' + m.maquina, arquivo:{'$content-type':m.mime, '$content':b64}})}, 180000);
+          body: JSON.stringify({maquina:m.maquina, nome:m.nome, mime:m.mime, pasta:(m.pasta || ('PEDIDOS_COMPRA/' + m.maquina)), arquivo:{'$content-type':m.mime, '$content':b64}})}, 180000);
         if(!resp.ok) throw new Error('http ' + resp.status);
         await idbApagar(m.id);
         const p = pedidos.find(x => x.pid === m.pid);
