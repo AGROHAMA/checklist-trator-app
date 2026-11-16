@@ -459,7 +459,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02k</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02l</span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -977,7 +977,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02k';
+const APP_VERSION = 'v02l';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -2152,7 +2152,7 @@ function trocaProximaHtml(info){
     if(!t) linhas.push(`ℹ️ <b>${escapeHtml(nome)}</b>: ainda não há códigos de filtro registrados. Anote na troca para a próxima vez já estar pronto.`);
     else {
       const f = trocaTextoFiltros(t), o = trocaTextoFluido('Óleo do motor', t.oleoMotor), h = trocaTextoFluido('Óleo hidráulico/transmissão', t.hid), a = trocaTextoFluido('Arrefecimento', t.arref);
-      linhas.push(`🛒 <b>Para a próxima ${escapeHtml(nome)}</b> (última em ${trocaDataBR(t.ts)}, ${trocaFmtH(t.hor)} h): ${[f, o, h, a].filter(Boolean).join('; ') || 'sem detalhes'}`);
+      linhas.push(`🛒 <b>Para a próxima ${escapeHtml(nome)}</b> (última em ${trocaDataBR(t.ts)}, ${trocaFmtH(t.hor)} h): ${[f, o, h, a].filter(Boolean).join('; ') || 'sem detalhes'}${(t.filtros||[]).some(x=>!x.c) ? ' <b>⚠️ faltam códigos (abra Mais detalhes → Completar códigos)</b>' : ''}`);
     }
   });
   return linhas.length ? `<div class="troca-prox">${linhas.join('<br>')}</div>` : '';
@@ -2162,7 +2162,8 @@ function trocaHistoricoHtml(cfg){
   maintItens(cfg).forEach(it=>{
     const l = it.trocas || []; if(!l.length) return;
     const nome = String(it.nome||'').replace(/\s*\(.*$/, '');
-    let h = `<div class="troca-blk"><b>${escapeHtml(nome)}</b> — última troca em ${trocaDataBR(l[0].ts)} · ${trocaFmtH(l[0].hor)} h${l[0].por ? ' · por ' + escapeHtml(l[0].por) : ''}<br>${trocaResumoHtml(l[0]) || 'sem detalhes'}`;
+    const faltaCod = (l[0].filtros||[]).some(f=>!f.c);
+    let h = `<div class="troca-blk"><b>${escapeHtml(nome)}</b> — última troca em ${trocaDataBR(l[0].ts)} · ${trocaFmtH(l[0].hor)} h${l[0].por ? ' · por ' + escapeHtml(l[0].por) : ''}${l[0].editadoPor ? ' (completado por ' + escapeHtml(l[0].editadoPor) + ')' : ''}<br>${trocaResumoHtml(l[0]) || 'sem detalhes'}${faltaCod ? '<br>⚠️ <b>Faltam códigos de filtro nesta troca.</b>' : ''}<br><button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="abrirTroca('${cfg.id}','${it.id}',true)">✏️ ${faltaCod ? 'Completar códigos' : 'Corrigir registro'}</button>`;
     if(l.length > 1) h += `<details style="margin-top:4px;"><summary>Trocas anteriores (${l.length-1})</summary>${l.slice(1).map(t=>`<div style="margin-top:4px;">${trocaDataBR(t.ts)} · ${trocaFmtH(t.hor)} h${t.por ? ' · ' + escapeHtml(t.por) : ''}<br>${trocaResumoHtml(t) || 'sem detalhes'}</div>`).join('')}</details>`;
     blocos.push(h + '</div>');
   });
@@ -2199,29 +2200,30 @@ function trocaRenderFotos(){
   el.innerHTML = trocaForm.files.map((f,i)=>`<div class="photo-field is-done" style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:13px;">📷 foto ${i+1} <span class="hint">(${Math.max(1, Math.round(f.blob.size/1024))} KB)</span></span><button class="btn btn-ghost btn-sm" onclick="trocaRemoverFoto(${i})">✕</button></div>`).join('');
 }
 function trocaRemoverFoto(i){ trocaForm.files.splice(i, 1); trocaRenderFotos(); }
-function abrirTroca(cfgId, itemId){
+function abrirTroca(cfgId, itemId, editar){
   const {cfg, it} = trocaBuscar(cfgId, itemId); if(!cfg || !it) return;
   const tipo = trocaTipoItem(it.nome);
   const ult = (it.trocas||[])[0] || null;
   const filtros = ult && (ult.filtros||[]).length ? ult.filtros.map(f=>({n:f.n||'', c:f.c||'', q:f.q||'1'}))
                                                    : trocaFiltrosPadrao(tipo).map(n=>({n, c:'', q:'1'}));
-  trocaForm = {cfgId, itemId, tipo, filtros, files:[]};
+  const edit = !!(editar && ult);
+  trocaForm = {cfgId, itemId, tipo, filtros, files:[], editar:edit};
   const atual = getCurrentHorimetro(cfg.trator);
   const quem = (()=>{ try{ return localStorage.getItem(TROCA_QUEM_KEY) || ''; }catch(e){ return ''; } })();
   const fl = (o, k) => escapeHtml(o && o[k] !== undefined ? String(o[k]) : '');
   const nomeCurto = String(it.nome||'').replace(/\s*\(.*$/, '');
-  document.getElementById('trocaTitle').textContent = `Troca: ${nomeCurto} — ${cfg.trator}`;
+  document.getElementById('trocaTitle').textContent = `${edit ? 'Completar troca' : 'Troca'}: ${nomeCurto} — ${cfg.trator}`;
   document.getElementById('trocaBody').innerHTML = `
-    <div class="ref-box">${ult ? `Os campos já vêm com o que foi usado na troca de <b>${trocaDataBR(ult.ts)}</b> (${trocaFmtH(ult.hor)} h). <b>Confira e corrija</b> o que mudou.` : `Primeira troca registrada deste item: anote os <b>códigos dos filtros</b> (leia na etiqueta de cada filtro novo) e o óleo usado. Da próxima vez isso já aparece pronto.`}
-      Ao salvar, a contagem de <b>${escapeHtml(nomeCurto)}</b> é zerada no horímetro informado.</div>
+    <div class="ref-box">${edit ? `Você está <b>completando/corrigindo</b> o registro da troca de <b>${trocaDataBR(ult.ts)}</b> (${trocaFmtH(ult.hor)} h). A contagem do item <b>não</b> é zerada de novo.` : ult ? `Os campos já vêm com o que foi usado na troca de <b>${trocaDataBR(ult.ts)}</b> (${trocaFmtH(ult.hor)} h). <b>Confira e corrija</b> o que mudou.` : `Primeira troca registrada deste item: anote os <b>códigos dos filtros</b> (leia na etiqueta de cada filtro novo) e o óleo usado. Da próxima vez isso já aparece pronto.`}
+      ${edit ? '' : `Ao salvar, a contagem de <b>${escapeHtml(nomeCurto)}</b> é zerada no horímetro informado.`}</div>
     <div class="row2">
-      <div class="field"><label>Horímetro da troca</label><input type="number" id="tr_hor" step="0.1" value="${atual !== null ? atual : ''}" placeholder="horímetro"></div>
-      <div class="field"><label>Quem fez a troca</label><input type="text" id="tr_quem" value="${escapeHtml(quem)}" placeholder="nome"></div>
+      <div class="field"><label>Horímetro da troca</label><input type="number" id="tr_hor" step="0.1" value="${edit ? ult.hor : (atual !== null ? atual : '')}" placeholder="horímetro"></div>
+      <div class="field"><label>${edit ? 'Quem está completando' : 'Quem fez a troca'}</label><input type="text" id="tr_quem" value="${escapeHtml(quem)}" placeholder="nome"></div>
     </div>
     <div class="troca-sec"><b>Filtros trocados</b>
       <div id="tr_filtros"></div>
       <button class="btn btn-secondary btn-sm" onclick="trocaAddFiltro()">+ Adicionar filtro</button>
-      <div class="hint">Código = o número impresso na caixa/etiqueta do filtro novo.</div>
+      <div class="hint"><b>Código obrigatório:</b> o número impresso na caixa/etiqueta do filtro. Se não achar, escreva "não achei". Se não trocou esse filtro, toque no ✕ para tirar da lista.</div>
     </div>
     ${tipo === 'motor' ? `<div class="troca-sec"><b>Óleo do motor</b><div class="row2">
       <div class="field"><label>Qual óleo</label><input type="text" id="tr_om_t" value="${fl(ult&&ult.oleoMotor,'tipo')}" placeholder="ex: 15W-40 CK-4"></div>
@@ -2232,14 +2234,14 @@ function abrirTroca(cfgId, itemId){
     <div class="troca-sec"><b>Líquido de arrefecimento (se trocou ou completou)</b><div class="row2">
       <div class="field"><label>Qual líquido (tipo/cor)</label><input type="text" id="tr_ar_t" value="${fl(ult&&ult.arref,'tipo')}" placeholder="ex: OAT rosa 50%"></div>
       <div class="field"><label>Litros</label><input type="number" id="tr_ar_l" step="0.1" value="${fl(ult&&ult.arref,'l')}" placeholder="litros"></div></div></div>
-    <div class="field"><label>Observações</label><textarea id="tr_obs" placeholder="opcional: algo que chamou a atenção, peça diferente, etc."></textarea></div>
+    <div class="field"><label>Observações</label><textarea id="tr_obs" placeholder="opcional: algo que chamou a atenção, peça diferente, etc.">${edit ? escapeHtml(ult.obs||'') : ''}</textarea></div>
     <div class="field"><label>Fotos (etiquetas dos filtros, adesivos, óleo)</label>
       <div class="actions-row" style="margin-bottom:6px;"><button class="btn btn-secondary btn-sm" onclick="document.getElementById('tr_file').click()">📷 Adicionar foto</button></div>
       <input type="file" id="tr_file" accept="image/*" multiple style="display:none;" onchange="trocaAddFotos(this.files);this.value='';">
       <div id="tr_fotos"></div>
       <div class="hint">Opcional. Vão para a pasta <b>TROCAS_MANUTENCAO/${escapeHtml(nomeSeguro(nomeParaManutencao(cfg.trator)))}</b>.</div>
     </div>
-    <div class="actions-row"><button class="btn btn-primary" id="tr_salvar" onclick="trocaSalvar()">Salvar troca</button></div>`;
+    <div class="actions-row"><button class="btn btn-primary" id="tr_salvar" onclick="trocaSalvar()">${edit ? 'Salvar alterações' : 'Salvar troca'}</button></div>`;
   trocaRenderFiltros();
   openModal('modalTroca');
 }
@@ -2250,29 +2252,38 @@ async function trocaSalvar(){
   const hor = parseFloat(v('tr_hor').replace(',', '.')), quem = v('tr_quem');
   if(isNaN(hor)){ toast('Informe o horímetro da troca.'); return; }
   if(!quem){ toast('Informe quem fez a troca.'); return; }
+  const edit = !!trocaForm.editar;
   const atual = getCurrentHorimetro(cfg.trator);
-  if(atual !== null && Math.abs(hor - atual) > 50 && !confirm(`O horímetro informado (${hor}) está bem diferente do atual (${atual}). Está certo?`)) return;
+  if(!edit && atual !== null && Math.abs(hor - atual) > 50 && !confirm(`O horímetro informado (${hor}) está bem diferente do atual (${atual}). Está certo?`)) return;
   trocaLerFiltros();
   const filtros = trocaForm.filtros.filter(f=>f.n || f.c);
-  if(!filtros.some(f=>f.c) && !confirm('Nenhum código de filtro foi informado. Registrar a troca mesmo assim?')) return;
+  const semCod = filtros.filter(f=>!f.c);
+  if(semCod.length){ toast(`Falta o código: ${semCod.map(f=>f.n || 'filtro').join('; ')}. Leia na caixa/etiqueta do filtro (se não achar, escreva "não achei"). Se não trocou, toque no ✕.`, 8000); return; }
+  if(!filtros.length && !confirm('Nenhum filtro na lista. Registrar mesmo assim?')) return;
   const btn = document.getElementById('tr_salvar'); if(btn) btn.disabled = true;
   const agora = Date.now(), maq = nomeSeguro(nomeParaManutencao(cfg.trator));
   const nomeCurto = nomeSeguro(String(it.nome||'Item').replace(/\s*\(.*$/, ''));
   const fotos = [], blobs = [];
   trocaForm.files.forEach((f, i) => {
-    const nome = `${maq} - TROCA ${nomeCurto} - ${fmtDMA(agora)} - ${i+1}.${f.ext}`;
+    const nome = `${maq} - TROCA ${nomeCurto} - ${fmtDMA(agora)} - ${((edit && (it.trocas[0].fotos||[]).length) || 0) + i + 1}.${f.ext}`;
     fotos.push(nome);
     blobs.push({id:'troca:' + trocaForm.cfgId + ':' + agora + ':' + nome, pid:null, maquina:maq, nome, mime:f.mime, blob:f.blob, ts:agora, pasta:'TROCAS_MANUTENCAO/' + maq});
   });
   try{ for(const b of blobs) await idbPut(b); }
   catch(e){ if(btn) btn.disabled = false; toast('Este aparelho não conseguiu guardar as fotos. Tente de novo ou salve sem foto.', 5000); return; }
   const fluido = (t, l) => (t || l) ? {tipo:t, l:l} : null;
-  const troca = {ts:agora, hor, por:quem, maq, filtros, oleoMotor:fluido(v('tr_om_t'), v('tr_om_l')), hid:fluido(v('tr_hid_t'), v('tr_hid_l')),
-    arref:fluido(v('tr_ar_t'), v('tr_ar_l')), obs:v('tr_obs'), fotos};
+  const novos = {filtros, oleoMotor:fluido(v('tr_om_t'), v('tr_om_l')), hid:fluido(v('tr_hid_t'), v('tr_hid_l')), arref:fluido(v('tr_ar_t'), v('tr_ar_l')), obs:v('tr_obs')};
   try{ localStorage.setItem(TROCA_QUEM_KEY, quem); }catch(e){}
-  it.trocas = [troca].concat(it.trocas || []).slice(0, TROCA_MAX_HIST);
-  it.horimetroUltima = String(hor);
-  it.alertSent = novoAlertSent();
+  if(edit){
+    const t0 = it.trocas[0], horMudou = hor !== parseFloat(t0.hor);
+    Object.assign(t0, novos, {hor, editadoPor:quem, editadoEm:agora, fotos:(t0.fotos||[]).concat(fotos)});
+    if(horMudou){ it.horimetroUltima = String(hor); it.alertSent = novoAlertSent(); }
+  } else {
+    const troca = Object.assign({ts:agora, hor, por:quem, maq, fotos}, novos);
+    it.trocas = [troca].concat(it.trocas || []).slice(0, TROCA_MAX_HIST);
+    it.horimetroUltima = String(hor);
+    it.alertSent = novoAlertSent();
+  }
   maintSyncLegacy(cfg);
   cfg.updatedAt = Date.now();
   saveMaint(maintConfigs);
@@ -2281,7 +2292,7 @@ async function trocaSalvar(){
   trocaForm = null;
   atualizarPendMidia(); enviarMidias();
   renderMaintenance(); renderMaintBanner(); render();
-  toast(`${nomeCurto}: troca registrada, contagem zerada.`);
+  toast(edit ? `${nomeCurto}: registro da troca atualizado.` : `${nomeCurto}: troca registrada, contagem zerada.`);
 }
 
 function markMaintDone(id, itemId){
