@@ -977,7 +977,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02l';
+const APP_VERSION = 'v02m';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1109,6 +1109,7 @@ function reconcileOutbox(){
     tx.onerror = tx.onabort = ()=>{ db.close(); resolve([]); };
   })).then(lista=>{
     let mudou = false, qtd = 0;
+    if(lista.length){ marcarEnvioOk(Math.max.apply(null, lista.map(s=>s.t || 0).concat([0])) || Date.now()); } // enviado em 2º plano com o app fechado
     lista.forEach(s=>{
       const id = String(s.key).slice(2);
       const r = records.find(x=>x && x.id === id);
@@ -1323,7 +1324,7 @@ function sendEventos(force){
     syncInFlight.add(p.key);
     return fetchTimeout(settings.evGravarUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:p.body}, 60000)
       .then(resp=>{
-        if(resp.ok){ p.rec[p.flag] = true; saveRecords(records); }
+        if(resp.ok){ p.rec[p.flag] = true; marcarEnvioOk(); saveRecords(records); }
         else armBackgroundSync();
         return resp.ok;
       }).catch(()=>{ armBackgroundSync(); return false; })
@@ -1608,6 +1609,31 @@ function suggestMachineRef(codigo){
   m = semEspaco.match(/^m\.?\s*t\.?[\s\-]*0*(\d{1,2})$/i);   // motores MT ##: ref 201–299
   if(m) return String(200 + parseInt(m[1], 10));
   return '';
+}
+// v02m: distância de edição (letras trocadas/faltando) para pegar "HK 54" no lugar de "KH 54".
+function distEdicao(a, b){
+  const m = a.length, n = b.length;
+  if(Math.abs(m - n) > 2) return 99;
+  let prev = []; for(let j = 0; j <= n; j++) prev[j] = j;
+  for(let i = 1; i <= m; i++){
+    const cur = [i];
+    for(let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+// Equipamento da lista mais parecido com o que o operador digitou (1 letra a mais/a menos/trocada, ou letras invertidas).
+function sugerirEquip(txt){
+  const a = normEquip(txt);
+  if(!a) return null;
+  let best = null, bd = 99;
+  MASTER_EQUIPAMENTOS.forEach(e=>{
+    const b = normEquip(e.codigo);
+    let d = distEdicao(a, b);
+    if(d > 1 && a.length === b.length && a.split('').sort().join('') === b.split('').sort().join('')) d = 1; // "hk54" x "kh54"
+    if(d < bd){ bd = d; best = e; }
+  });
+  return bd <= 1 ? best : null;
 }
 function buildEquipDatalist(){
   const dl = document.getElementById('equipSuggestions');
@@ -2640,10 +2666,20 @@ function setNow(fieldId){
 function saveStart(){
   const farm = document.getElementById('f_farm').value.trim();
   const operator = document.getElementById('f_operator').value.trim();
-  const tractor = document.getElementById('f_tractor').value.trim();
+  let tractor = document.getElementById('f_tractor').value.trim();
   if(!farm || !operator || !tractor){
     toast('Preencha ao menos Fazenda, Operador e Trator.');
     return;
+  }
+  // v02m: nome do trator fora da lista de equipamentos (caso "HK 54" em vez de "KH 54", que ficou fora do histórico do KH 54).
+  if(!findMasterEquip(tractor)){
+    const sug = sugerirEquip(tractor);
+    if(sug){
+      if(confirm(`"${tractor}" não está na lista de equipamentos.\n\nVocê quis dizer ${sug.codigo} (${sug.descricao})?\n\nOK = usar ${sug.codigo}\nCancelar = não usar`)){
+        tractor = sug.codigo;
+        document.getElementById('f_tractor').value = tractor;
+      } else if(!confirm(`Manter "${tractor}" mesmo assim?\n\nSe o nome estiver errado, esta operação não vai aparecer no histórico e na manutenção do trator certo.\n\nOK = manter "${tractor}"\nCancelar = voltar e corrigir`)) return;
+    } else if(!confirm(`Não encontrei "${tractor}" na lista de equipamentos.\n\nConfira o nome (ex.: KH 54). Se for um equipamento novo, pode continuar.\n\nOK = continuar assim mesmo\nCancelar = voltar e corrigir`)) return;
   }
   // Máquina já em operação (neste ou em outro aparelho)? Avisa antes de abrir uma segunda operação.
   const jaAbertas = operacoesAbertas().filter(o => normEquip(o.maquina) === normEquip(nomeParaManutencao(tractor)));
@@ -2815,7 +2851,13 @@ function saveFinish(){
       return;
     }
     if(hfNum < hiRec){
-      if(!confirm(`Confira o horímetro final!\n\nO final (${hfNum}) está MENOR que o inicial (${hiRec}).\n\nOK = salvar assim mesmo\nCancelar = voltar e corrigir`)) return;
+      // v02m: antes era só um "OK = salvar assim mesmo" e os operadores apertavam OK (KH 57: 5707.0 -> 570.8;
+      // KH 51: 7351.7 -> 1306.0). Agora o operador não consegue salvar; só o administrador pode (ex.: painel trocado/zerado).
+      if(!isAdmin()){
+        alert(`Horímetro final ERRADO!\n\nO final (${hfNum}) é MENOR que o inicial (${hiRec}). O horímetro da máquina nunca volta.\n\nOlhe de novo o painel da máquina — provavelmente faltou um dígito ou a vírgula está no lugar errado — e digite o valor correto.\n\nSe o painel realmente zerou ou foi trocado, chame o responsável.`);
+        return;
+      }
+      if(!confirm(`(Administrador) O final (${hfNum}) está MENOR que o inicial (${hiRec}).\n\nOK = salvar assim mesmo\nCancelar = voltar e corrigir`)) return;
     }
   }
   r.horaFinal = document.getElementById('fin_horaFinal').value;
@@ -3152,6 +3194,7 @@ function attemptSync(record, eventType, force){
     }).then(resp=>{
       if(resp.ok){
         record.synced = true;
+        marcarEnvioOk();
         saveRecords(records);
         render();
       }
@@ -3191,6 +3234,7 @@ function syncHorimetroAtualizado(record, force){
   }).then(resp=>{
     if(resp.ok){
       record.horimetroSynced = true;
+      marcarEnvioOk();
       saveRecords(records);
       // Sem isso, o contador de "pendências" no topo da tela fica desatualizado até a próxima
       // ação do usuário — mesmo depois do envio ter sido confirmado com sucesso em segundo plano.
@@ -3263,8 +3307,24 @@ function updatePendingSyncButton(){
   const nH = pendingHorimetroSyncs().length; if(nH) det.push(`${nH} horímetro(s)`);
   const nM = pendingMaintAlerts().length; if(nM) det.push(`${nM} alerta(s) de manutenção`);
   const nE = eventosPendentes().length + (settings.evGravarUrl ? loadCancels().length : 0); if(nE) det.push(`${nE} evento(s) do painel`);
-  btn.innerHTML = `📤 Enviar pendências agora (${total})<small style="display:block;font-weight:400;font-size:11px;margin-top:2px;">${det.join(' · ')}</small>`;
+  // v02m: quanto tempo o mais antigo está preso e quando foi o último envio que deu certo neste aparelho.
+  let maisAntigo = 0;
+  try{
+    const ts = [];
+    if(settings.webhookUrl) records.filter(r=>r && !r.synced).forEach(r=>ts.push(r.updatedAt || r.createdAt || 0));
+    eventosPendentes().forEach(p=>{ if(p.rec) ts.push(p.rec.updatedAt || p.rec.createdAt || 0); });
+    const v = ts.filter(x=>x > 0); if(v.length) maisAntigo = Math.min.apply(null, v);
+  }catch(e){}
+  const idade = maisAntigo ? Date.now() - maisAntigo : 0;
+  const ult = ultimoEnvioOk();
+  const extra = [];
+  if(idade > 30*60000) extra.push(`⚠️ preso há ${fmtDur(idade)} — vá para um lugar com sinal e toque aqui`);
+  extra.push(ult ? `último envio concluído: ${new Date(ult).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}` : 'nenhum envio concluído neste aparelho ainda');
+  btn.innerHTML = `📤 Enviar pendências agora (${total})<small style="display:block;font-weight:400;font-size:11px;margin-top:2px;">${det.join(' · ')}</small><small style="display:block;font-weight:400;font-size:11px;margin-top:2px;${idade > 30*60000 ? 'color:#b00020;font-weight:600;' : ''}">${extra.join(' · ')}</small>`;
 }
+// v02m: registra o horário do último envio que deu certo (mostrado no botão de pendências).
+function marcarEnvioOk(t){ try{ localStorage.setItem('agrohama_last_send_ok_v1', String(t || Date.now())); }catch(e){} }
+function ultimoEnvioOk(){ try{ return parseInt(localStorage.getItem('agrohama_last_send_ok_v1')) || 0; }catch(e){ return 0; } }
 
 // Envio manual, forçado: tenta enviar mesmo que "envio automático" esteja desligado ou o
 // aparelho ache que está offline — cobre o caso do sinal ser instável no campo.
