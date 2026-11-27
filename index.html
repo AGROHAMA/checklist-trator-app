@@ -845,6 +845,17 @@
     <form id="formFinish" onsubmit="return false;">
       <input type="hidden" id="fin_id">
       <div class="ref-box" id="fin_resumo"></div>
+      <div id="fin_retomadaBox" style="display:none;">
+        <div class="hint" style="margin-bottom:8px;">Esta operação não foi finalizada pelo operador. Olhe o <b>horímetro que está na máquina</b> e informe abaixo. Se a máquina já foi usada por outra pessoa depois, informe o horímetro de quando esta operação terminou.</div>
+        <div class="field">
+          <label>Quem está finalizando? (obrigatório)</label>
+          <input type="text" id="fin_por" placeholder="Seu nome" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Data do fim da operação</label>
+          <input type="date" id="fin_dataFim">
+        </div>
+      </div>
       <div class="field">
         <label>Hora Final</label>
         <input type="time" id="fin_horaFinal">
@@ -977,7 +988,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02m';
+const APP_VERSION = 'v02n';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -1138,6 +1149,33 @@ function loadRecords(){
   try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
   catch(e){ return []; }
 }
+// v02n: fotos do checklist só ficam neste aparelho (ainda não são enviadas a lugar nenhum). Para o armazenamento não
+// encher, as fotos de operações CONCLUÍDAS com mais de FOTOS_DIAS dias são apagadas sozinhas; os registros (dados) ficam.
+const FOTOS_DIAS = 7;
+function temFotos(r){
+  return !!(r && ((r.fotos && (r.fotos.agua || r.fotos.oleoMotor || r.fotos.filtroAr || r.fotos.oleoHidraulico)) || (r.problema && r.problema.foto)));
+}
+function limparFotosRegistro(r){
+  r.fotos = {agua:null, oleoMotor:null, filtroAr:null, oleoHidraulico:null};
+  if(r.problema && r.problema.foto) r.problema.foto = null;
+}
+function limparFotosAntigas(dias){
+  const limite = Date.now() - (dias || FOTOS_DIAS)*86400000;
+  let n = 0;
+  records.forEach(r=>{
+    if(r && r.status === 'concluido' && (r.updatedAt || r.createdAt || 0) < limite && temFotos(r)){ limparFotosRegistro(r); n++; }
+  });
+  if(n){ debugLog('fotos_antigas_apagadas', {qtd:n, dias:dias || FOTOS_DIAS}); saveRecords(records); }
+  return n;
+}
+let _avisoCheioT = 0;
+function avisoArmazenamentoCheio(){
+  // Alerta que bloqueia (não só um toast que some): sem espaço, o registro novo existe só até fechar o app.
+  toast('ATENÇÃO: armazenamento do aparelho está cheio e este registro pode não ter sido salvo localmente.', 9000);
+  if(Date.now() - _avisoCheioT < 10*60000) return;
+  _avisoCheioT = Date.now();
+  try{ alert('ATENÇÃO: o armazenamento do aparelho está CHEIO.\n\nEste registro NÃO foi salvo no aparelho e pode sumir quando você fechar o app.\n\nAvise o responsável agora (ele consegue liberar espaço) e não feche o app antes de finalizar a operação.'); }catch(e){}
+}
 function saveRecords(records){
   // Proteção contra "instância atrasada": se o app foi aberto mais de uma vez ao mesmo tempo no
   // mesmo aparelho (ex.: tocou no ícone de novo sem o anterior ter fechado direito), cada cópia
@@ -1165,23 +1203,34 @@ function saveRecords(records){
     return true;
   }catch(e){
     // Armazenamento cheio (comum em aparelhos com muitas fotos acumuladas).
-    // Tenta liberar espaço removendo fotos de registros antigos já concluídos e sincronizados.
+    // v02n: libera espaço só apagando FOTOS (os registros ficam), em etapas: 1) fotos de operações concluídas com mais de
+    // 7 dias; 2) fotos de concluídas já enviadas; 3) último recurso: fotos de qualquer concluída, da mais antiga p/ a mais nova.
+    // Operação em andamento nunca perde foto.
     try{
+      const limite7 = Date.now() - FOTOS_DIAS*86400000;
+      const etapas = [
+        r => r.status === 'concluido' && (r.updatedAt || r.createdAt || 0) < limite7,
+        r => r.status === 'concluido' && r.synced,
+        r => r.status === 'concluido'
+      ];
       const sorted = toSave.slice().sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));
-      for(const r of sorted){
-        if(r.synced && r.status === 'concluido' && r.fotos && (r.fotos.agua || r.fotos.oleoMotor || r.fotos.filtroAr || r.fotos.oleoHidraulico)){
-          r.fotos = {agua:null, oleoMotor:null, filtroAr:null, oleoHidraulico:null};
-          try{
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-            saveBackup(toSave);
-            toast('Armazenamento do aparelho estava cheio: fotos antigas já sincronizadas foram apagadas do aparelho para liberar espaço.', 9000);
-            return true;
-          }catch(e2){ /* continua liberando mais registros */ }
+      for(const crit of etapas){
+        for(const r of sorted){
+          if(r && crit(r) && temFotos(r)){
+            limparFotosRegistro(r);
+            try{
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+              saveBackup(toSave);
+              debugLog('fotos_apagadas_espaco', {id: r.id});
+              toast('Armazenamento do aparelho estava cheio: fotos antigas foram apagadas do aparelho para liberar espaço (os registros ficaram).', 9000);
+              return true;
+            }catch(e2){ /* continua liberando mais registros */ }
+          }
         }
       }
     }catch(e3){ /* ignora e cai no aviso abaixo */ }
     debugLog('armazenamento_cheio_falhou', {qtd: toSave.length});
-    toast('ATENÇÃO: armazenamento do aparelho está cheio e este registro pode não ter sido salvo localmente.', 9000);
+    avisoArmazenamentoCheio();
     return false;
   }
 }
@@ -1279,7 +1328,8 @@ function evInicio(r){
 }
 function evFim(r){
   return {id:'f_'+r.id, tipo:'fim', refInicio:'i_'+r.id, refOp:r.id, maquina:nomeParaManutencao(r.tractor), operador:r.operator||'',
-    data:r.date, dataFim:r.dataFim||r.date, horaFinal:r.horaFinal||'', horimetroFinal:r.horimetroFinal, criadoEm:r.updatedAt};
+    data:r.date, dataFim:r.dataFim||r.date, horaFinal:r.horaFinal||'', horimetroFinal:r.horimetroFinal, criadoEm:r.updatedAt,
+    finalizadoPor:r.finalizadoPor||''};
 }
 function evCancelamento(refInicio, maquina, motivo){
   return {id:'f_x_'+String(refInicio).slice(2)+'_'+Date.now().toString(36), tipo:'fim', refInicio, maquina:nomeParaManutencao(maquina),
@@ -1432,7 +1482,19 @@ function renderSharedPanel(){
       const desde = new Date(o.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       const onde = [o.talhao, o.implemento].filter(Boolean).map(escapeHtml).join(' · ');
       const hi = (o.horimetroInicial !== '' && o.horimetroInicial !== undefined && o.horimetroInicial !== null) ? ` · hor. inicial <b>${escapeHtml(o.horimetroInicial)}</b>` : '';
-      const btn = (stale && !o.local) ? `<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="encerrarPeloPainel('${escapeHtml(o.id)}')">Encerrar (operação esquecida)</button></div>` : '';
+      // v02n: quem esqueceu de finalizar (ou perdeu o registro no aparelho) não trava mais a máquina no painel:
+      // outra pessoa pode "Finalizar" informando o horímetro lido na máquina (gera o relatório normal), ou o próprio
+      // operador pode "Retomar e finalizar" uma operação dele que sumiu do aparelho. "Encerrar sem horímetro" continua existindo.
+      const nomeOp = norm(o.operador||'').toLowerCase().trim();
+      const minha = !o.local && !!nomeOp && records.some(x=>x && norm(x.operator||'').toLowerCase().trim() === nomeOp);
+      let btn = '';
+      if(!o.local && (stale || minha)){
+        const idq = escapeHtml(o.id);
+        btn = `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">`
+          + `<button class="btn btn-primary btn-sm" onclick="retomarOperacao('${idq}')">${minha && !stale ? 'Retomar e finalizar' : 'Finalizar (horímetro da máquina)'}</button>`
+          + (stale ? `<button class="btn btn-ghost btn-sm" onclick="encerrarPeloPainel('${idq}')">Encerrar sem horímetro</button>` : '')
+          + `</div>`;
+      }
       return `<div class="sp-row${stale?' is-stale':''}${o.local?' is-mine':''}">
         <div class="sp-top"><span class="sp-m"><b>${escapeHtml(o.maquina)}</b> <span class="sp-who">${escapeHtml(o.operador||'-')}</span></span><span class="sp-dur">${stale?'⚠️ ':''}${fmtDur(dur)}</span></div>
         <div class="sp-sub">${onde ? onde + ' · ' : ''}desde ${desde}${hi}</div>${btn}
@@ -1447,6 +1509,40 @@ function renderSharedPanel(){
       </div>`).join('') : `<div class="sp-empty">Nenhuma manutenção ${stripAberto==='venc'?'vencida':'se aproximando'}. ✔️</div>`}</div>`;
   }
   el.innerHTML = `<div class="sp-wrap">${strip}${corpo}</div>`;
+}
+// v02n: recria neste aparelho o registro "em andamento" de uma operação que existe no painel compartilhado (início já
+// enviado) mas não existe aqui — operador que esqueceu de finalizar, registro que sumiu do aparelho ou operação
+// aberta em outro celular. Abre o formulário normal de Finalizar (com "Quem está finalizando?"), então o fim sai
+// com horímetro, relatório no Teams/Planner e atualização do horímetro da máquina como qualquer outra operação.
+function retomarOperacao(id){
+  const o = operacoesAbertas().find(x=>x.id === id);
+  if(!o){ toast('Essa operação já foi encerrada. Toque em ↻ para atualizar.'); return; }
+  const e = sharedEvents.find(x=>x && x.id === id && x.tipo === 'inicio');
+  if(!e){ toast('Não achei os dados do início dessa operação. Toque em ↻ e tente de novo.'); return; }
+  const rid = e.refOp || String(id).replace(/^i_/, '');
+  const ja = records.find(x=>x && x.id === rid);
+  if(ja && ja.status === 'andamento'){ openFinishForm(rid); return; }
+  if(ja){ toast('Essa operação já consta como concluída neste aparelho.'); return; }
+  const r = {
+    id: rid, formNumber: e.talao || '', date: e.data || todayISO(),
+    farm: e.fazenda || '', operator: e.operador || '', tractor: e.maquina,
+    plot: e.talhao || '', culture: e.cultura || '', operation: e.operacao || '', implement: e.implemento || '',
+    horaInicio: e.horaInicio || '', horaFinal: '',
+    horimetroInicial: (e.horimetroInicial === undefined || e.horimetroInicial === null) ? '' : String(e.horimetroInicial),
+    horimetroFinal: '',
+    fotos: {agua:null, oleoMotor:null, filtroAr:null, oleoHidraulico:null},
+    checklist: {agua:false, oleoMotor:false, filtroAr:false, oleoHidraulico:false},
+    obs: '', problema: null, status: 'andamento',
+    createdAt: e.criadoEm || Date.now(), updatedAt: Date.now(),
+    synced: true, launched: false,
+    compart: true, evInicioSynced: true, evFimSynced: false,
+    retomada: true
+  };
+  records.push(r);
+  debugLog('operacao_retomada', {id: rid, trator: r.tractor, operador: r.operator});
+  saveRecords(records);
+  render();
+  openFinishForm(rid);
 }
 function encerrarPeloPainel(id){
   const o = operacoesAbertas().find(x=>x.id === id);
@@ -2821,6 +2917,13 @@ function openFinishForm(id){
   document.getElementById('fin_horaFinal').value = nowHM();
   document.getElementById('fin_horimetroFinal').value = '';
   document.getElementById('fin_obs').value = '';
+  // v02n: operação retomada/finalizada por outra pessoa pede o nome de quem finaliza e a data do fim
+  const retBox = document.getElementById('fin_retomadaBox');
+  if(retBox){
+    retBox.style.display = r.retomada ? 'block' : 'none';
+    document.getElementById('fin_por').value = '';
+    document.getElementById('fin_dataFim').value = todayISO();
+  }
   const hiTxt = (r.horimetroInicial === '' || r.horimetroInicial === undefined || r.horimetroInicial === null) ? 'não informado' : String(r.horimetroInicial);
   document.getElementById('fin_resumo').innerHTML = `🚜 <b>${escapeHtml(r.tractor||'-')}</b> · 👤 ${escapeHtml(r.operator||'-')}<br>`
     + `Início: <b>${escapeHtml(fmtDateBR(r.date))} às ${escapeHtml(r.horaInicio||'--:--')}</b> · Horímetro inicial: <b>${escapeHtml(hiTxt)}</b>`;
@@ -2831,6 +2934,13 @@ function saveFinish(){
   const r = records.find(x=>x.id===id);
   if(!r){ toast('Essa operação não foi encontrada neste aparelho. Nada foi salvo. Avise o suporte.', 9000); closeModal('modalFinish'); return; }
 
+  // v02n: operação retomada/finalizada por outra pessoa: exige o nome de quem finaliza e o horímetro lido na máquina.
+  let finPor = '';
+  if(r.retomada){
+    finPor = document.getElementById('fin_por').value.trim();
+    if(!finPor){ toast('Informe quem está finalizando a operação.'); return; }
+    if(isNaN(parseFloat(document.getElementById('fin_horimetroFinal').value))){ toast('Informe o horímetro que está na máquina.'); return; }
+  }
   // Confere o horímetro final com o inicial (final menor, ou salto maior que 24 h de uso, quase sempre é digitação errada).
   const hfNum = parseFloat(document.getElementById('fin_horimetroFinal').value);
   const hiRec = parseFloat(r.horimetroInicial);
@@ -2868,6 +2978,17 @@ function saveFinish(){
   r.synced = false;
   r.horimetroSynced = false;
   r.compart = true; r.evFimSynced = false; r.dataFim = todayISO();
+  if(r.retomada){
+    const dfv = document.getElementById('fin_dataFim').value;
+    if(dfv) r.dataFim = dfv;
+    r.finalizadoPor = finPor;
+    const mesma = norm(finPor).toLowerCase().trim() === norm(r.operator||'').toLowerCase().trim();
+    const nota = mesma
+      ? `Operação retomada e finalizada por ${finPor} (o registro tinha sumido do aparelho).`
+      : `Operação finalizada por ${finPor}, pois o operador (${r.operator||'-'}) não finalizou. Horímetro final lido na máquina.`;
+    r.obs = nota + (r.obs ? ' ' + r.obs : '');
+    debugLog('operacao_finalizada_por_outro', {id:r.id, por:finPor, operador:r.operator});
+  }
   const saved = saveRecords(records);
   closeModal('modalFinish');
   render();
@@ -2999,10 +3120,18 @@ function resolveProblem(id){
 
 function deleteRecord(id){
   const _r = records.find(r=>r.id===id);
-  const msgExcluir = (_r && _r.synced)
-    ? 'Este registro JÁ FOI ENVIADO ao Planner/Teams. Excluir aqui apaga só a cópia deste aparelho: o card e a mensagem lá continuam (apague lá também, se precisar).\n\nExcluir mesmo assim?'
-    : 'Excluir este registro deste aparelho?';
-  if(!confirm(msgExcluir)) return;
+  // v02n: pergunta mais clara; operação EM ANDAMENTO pede confirmação dupla (em 23/11 uma operação aberta foi
+  // excluída no aparelho e ficou sem fim; o operador perdia o registro sem perceber o que estava apagando).
+  if(_r && _r.status === 'andamento'){
+    const quem = `${_r.tractor||'-'} · ${_r.operator||'-'} · desde ${fmtDateBR(_r.date)} ${_r.horaInicio||''}`;
+    if(!confirm(`⚠️ ESTA OPERAÇÃO ESTÁ EM ANDAMENTO!\n\n${quem}\n\nExcluir NÃO finaliza a operação: você perde o registro e a máquina é retirada do painel de "em operação", sem horímetro final e sem relatório de fim.\n\nPara terminar a operação, toque em "Finalizar".\n\nQuer realmente EXCLUIR mesmo assim?`)) return;
+    if(!confirm(`Última confirmação:\n\nExcluir a operação em andamento de ${_r.tractor||'-'}?\n\nIsso não pode ser desfeito.\n\nOK = excluir de vez\nCancelar = manter a operação`)) return;
+  } else {
+    const msgExcluir = (_r && _r.synced)
+      ? 'Este registro JÁ FOI ENVIADO ao Planner/Teams. Excluir aqui apaga só a cópia deste aparelho: o card e a mensagem lá continuam (apague lá também, se precisar).\n\nQuer realmente excluir?'
+      : '⚠️ Este registro ainda NÃO foi enviado ao Planner/Teams. Se excluir, ele se perde.\n\nQuer realmente excluir?';
+    if(!confirm(msgExcluir)) return;
+  }
   debugLog('registro_excluido', {id});
   const excl = records.find(r=>r.id===id);
   if(excl && excl.compart && excl.status === 'andamento' && settings.evGravarUrl) queueCancel(evCancelamento('i_'+id, excl.tractor, 'excluída no aparelho'));
@@ -3075,10 +3204,12 @@ function buildTeamsText(r){
 
 4. Checklist de Manutenção:
 
-* ${chk.agua ? '(X)' : '( )'} Água / Líquido de Arrefecimento ${r.fotos && r.fotos.agua ? '📷 foto anexada' : ''}
+${r.retomada
+  ? '* Checklist não registrado neste fechamento (operação finalizada por ' + (r.finalizadoPor || 'outra pessoa') + ').'
+  : `* ${chk.agua ? '(X)' : '( )'} Água / Líquido de Arrefecimento ${r.fotos && r.fotos.agua ? '📷 foto anexada' : ''}
 * ${chk.oleoMotor ? '(X)' : '( )'} Óleo Motor (vareta) ${r.fotos && r.fotos.oleoMotor ? '📷 foto anexada' : ''}
 * ${chk.filtroAr ? '(X)' : '( )'} Filtro de Ar ${r.fotos && r.fotos.filtroAr ? '📷 foto anexada' : ''}
-* ${chk.oleoHidraulico ? '(X)' : '( )'} Óleo Hidráulico ${r.fotos && r.fotos.oleoHidraulico ? '📷 foto anexada' : ''}
+* ${chk.oleoHidraulico ? '(X)' : '( )'} Óleo Hidráulico ${r.fotos && r.fotos.oleoHidraulico ? '📷 foto anexada' : ''}`}
 
 5. Observações:
 
@@ -3972,6 +4103,8 @@ if(records.some(r => r && r.status === 'andamento' && r.compart === undefined)){
   saveRecords(records);
 }
 render();
+// v02n: apaga sozinho as fotos (não os registros) de operações concluídas com mais de 7 dias, ao abrir e a cada 6 h.
+try{ limparFotosAntigas(); setInterval(()=>{ try{ limparFotosAntigas(); }catch(e){} }, 6*3600*1000); }catch(e){}
 try{ mergeSharedMaint(); }catch(e){}
 checkMaintenanceAlerts();
 updatePendingSyncButton();
