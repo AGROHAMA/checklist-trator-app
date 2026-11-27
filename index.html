@@ -459,7 +459,7 @@
 
 <header>
   <h1>🚜 Checklist de Trator Digital</h1>
-  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip">v02l</span></div>
+  <div class="sub">Agrohama · Operações Agrícolas / Manutenção <span class="ver-chip" id="verChip"></span></div>
   <div id="connStatus" class="status-pill status-offline"><span class="dot"></span> verificando conexão…</div>
 </header>
 
@@ -988,7 +988,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 /* ===================== Armazenamento local (offline-first) ===================== */
-const APP_VERSION = 'v02n';
+const APP_VERSION = 'v02o';
 const STORAGE_KEY = 'agrohama_operacoes_v1';
 const SETTINGS_KEY = 'agrohama_operacoes_settings_v1';
 // Backup enxuto (sem fotos, pra não pesar) mantido à parte, sempre que um salvamento principal dá
@@ -4097,6 +4097,8 @@ if(navigator.storage && navigator.storage.persist){
 updateConnStatus();
 buildEquipDatalist();
 try{ document.getElementById('appVersionLabel').textContent = APP_VERSION; }catch(e){}
+// v02o: o chip do topo era texto fixo (ficou em v02l nas versões v02m e v02n); agora vem sempre de APP_VERSION.
+try{ document.getElementById('verChip').textContent = APP_VERSION; }catch(e){}
 // v14: operações que já estavam em andamento antes da atualização passam a ser compartilhadas também.
 if(records.some(r => r && r.status === 'andamento' && r.compart === undefined)){
   records.forEach(r => { if(r && r.status === 'andamento' && r.compart === undefined) r.compart = true; });
